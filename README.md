@@ -13,3 +13,7 @@ It contains code reproducing all the shown results, and will grow along with the
 ## Bandits
 
     python bandits.py
+
+## Grid World
+
+    python grid_world.py --method {METHOD}
