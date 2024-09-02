@@ -1,7 +1,7 @@
 import numpy as np
-from gymnasium.spaces import Discrete
 
 from env import ParametrizedEnv
+from gym_utils import get_observation_action_space
 
 
 def policy_iteration(env: ParametrizedEnv) -> np.ndarray:
@@ -14,11 +14,7 @@ def policy_iteration(env: ParametrizedEnv) -> np.ndarray:
     Returns:
         found policy
     """
-    # Make mypy happy ...
-    assert isinstance(env.env.observation_space, Discrete)
-    observation_space: Discrete = env.env.observation_space
-    assert isinstance(env.env.action_space, Discrete)
-    action_space: Discrete = env.env.action_space
+    observation_space, action_space = get_observation_action_space(env)
 
     pi = np.zeros(observation_space.n).astype(np.int32)
 
@@ -63,10 +59,16 @@ def policy_iteration(env: ParametrizedEnv) -> np.ndarray:
 
 
 def value_iteration(env: ParametrizedEnv) -> np.ndarray:
-    assert isinstance(env.env.observation_space, Discrete)
-    observation_space: Discrete = env.env.observation_space
-    assert isinstance(env.env.action_space, Discrete)
-    action_space: Discrete = env.env.action_space
+    """Uses 'Value Iteration' to solve the RL problem
+    specified by the passed Gymnasium env.
+
+    Args:
+        env: env containing the problem
+
+    Returns:
+        found policy
+    """
+    observation_space, action_space = get_observation_action_space(env)
 
     V = np.zeros(observation_space.n)
 

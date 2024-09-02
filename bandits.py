@@ -62,7 +62,10 @@ def bandit_solver(
 def main() -> None:
     bandits = initialize_bandits()
     epss = [0, 0.01, 0.1]
-    reward_averages = [bandit_solver(bandits, lambda q, n, t: simple_crit(q, n, t, eps)) for eps in epss]
+    reward_averages = [
+        bandit_solver(bandits, lambda q, n, t: simple_crit(q, n, t, eps))
+        for eps in epss
+    ]
     colors = ["r-", "b-", "g-"]
     for idx, reward_average in enumerate(reward_averages):
         plt.plot(
