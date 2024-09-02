@@ -4,6 +4,7 @@ import gymnasium as gym
 
 from dp import policy_iteration, value_iteration
 from env import ParametrizedEnv
+from mc import mc_es, off_policy_mc, off_policy_mc_non_inc, on_policy_mc
 
 GAMMA = 0.97
 EPS = 0.001
@@ -16,36 +17,52 @@ def solve_grid_world(method: str) -> None:
     Args:
         method: solving method
     """
-    gym_env = gym.make(
+    gym_env_train = gym.make(
+        "FrozenLake-v1",
+        desc=None,
+        map_name="4x4",
+        is_slippery=False,
+    )
+    env_train = ParametrizedEnv(gym_env_train, GAMMA, EPS)
+
+    # Find policy
+    if method == "policy_iteration":
+        pi = policy_iteration(env_train)
+    elif method == "value_iteration":
+        pi = value_iteration(env_train)
+    elif method == "mc_es":
+        pi = mc_es(env_train)
+    elif method == "on_policy_mc":
+        pi = on_policy_mc(env_train)
+    elif method == "off_policy_mc":
+        pi = off_policy_mc(env_train)
+    elif method == "off_policy_mc_non_inc":
+        pi = off_policy_mc_non_inc(env_train)
+    else:
+        raise ValueError(f"Unknown solution method {method}")
+    gym_env_train.close()
+
+    gym_env_test = gym.make(
         "FrozenLake-v1",
         desc=None,
         map_name="4x4",
         is_slippery=False,
         render_mode="human",
     )
-    env = ParametrizedEnv(gym_env, GAMMA, EPS)
-
-    # Find policy
-    if method == "policy_iteration":
-        pi = policy_iteration(env)
-    elif method == "value_iteration":
-        pi = value_iteration(env)
-    else:
-        raise ValueError(f"Unknown solution method {method}")
 
     # Test policy and visualize found solution
-    observation, _ = env.env.reset()
+    observation, _ = gym_env_test.reset()
     for _ in range(NUM_STEPS):
         action = pi[observation]
-        observation, _, terminated, truncated, _ = env.env.step(action)
+        observation, _, terminated, truncated, _ = gym_env_test.step(action)
         if terminated or truncated:
             break
-    env.env.close()
+    gym_env_test.close()
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Process a string input.")
     parser.add_argument("--method", type=str, required=True, help="A string input")
     args = parser.parse_args()
-    
+
     solve_grid_world(args.method)
