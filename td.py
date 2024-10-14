@@ -1,9 +1,9 @@
 import random
 
-from gym_utils import get_observation_action_space
 import numpy as np
 
 from env import ParametrizedEnv
+from gym_utils import get_observation_action_space
 
 ALPHA = 0.1
 NUM_STEPS = 1000
@@ -38,7 +38,7 @@ def sarsa(env: ParametrizedEnv) -> np.ndarray:
     return np.array([np.argmax(Q[s]) for s in range(observation_space.n)])
 
 
-def q(env):
+def q(env) -> np.ndarray:
     observation_space, action_space = get_observation_action_space(env)
     Q = np.zeros((observation_space.n, action_space.n))
 
@@ -88,7 +88,7 @@ def expected_sarsa(env: ParametrizedEnv) -> np.ndarray:
     return np.array([np.argmax(Q[s]) for s in range(observation_space.n)])
 
 
-def double_q(env):
+def double_q(env) -> np.ndarray:
     observation_space, action_space = get_observation_action_space(env)
     Q_1 = np.zeros((observation_space.n, action_space.n))
     Q_2 = np.zeros((observation_space.n, action_space.n))
