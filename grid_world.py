@@ -5,6 +5,7 @@ import gymnasium as gym
 from dp import policy_iteration, value_iteration
 from env import ParametrizedEnv
 from mc import mc_es, off_policy_mc, off_policy_mc_non_inc, on_policy_mc
+from td import double_q, expected_sarsa, q, sarsa
 
 GAMMA = 0.97
 EPS = 0.001
@@ -38,6 +39,14 @@ def solve_grid_world(method: str) -> None:
         pi = off_policy_mc(env_train)
     elif method == "off_policy_mc_non_inc":
         pi = off_policy_mc_non_inc(env_train)
+    elif method == "sarsa":
+        pi = sarsa(env_train)
+    elif method == "q":
+        pi = q(env_train)
+    elif method == "expected_sarsa":
+        pi = expected_sarsa(env_train)
+    elif method == "double_q":
+        pi = double_q(env_train)
     else:
         raise ValueError(f"Unknown solution method {method}")
     gym_env_train.close()
