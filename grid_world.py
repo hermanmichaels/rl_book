@@ -6,6 +6,7 @@ from dp import policy_iteration, value_iteration
 from env import ParametrizedEnv
 from mc import mc_es, off_policy_mc, off_policy_mc_non_inc, on_policy_mc
 from td import double_q, expected_sarsa, q, sarsa
+from td_n import sarsa_n, tree_n
 
 GAMMA = 0.97
 EPS = 0.001
@@ -47,6 +48,10 @@ def solve_grid_world(method: str) -> None:
         pi = expected_sarsa(env_train)
     elif method == "double_q":
         pi = double_q(env_train)
+    elif method == "sarsa_n":
+        pi = sarsa_n(env_train)
+    elif method == "tree_n":
+        pi = tree_n(env_train)
     else:
         raise ValueError(f"Unknown solution method {method}")
     gym_env_train.close()
