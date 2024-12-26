@@ -4,16 +4,10 @@ import numpy as np
 
 from env import ParametrizedEnv
 from gym_utils import get_observation_action_space
+from utils import get_eps_greedy_action
 
 ALPHA = 0.1
 NUM_STEPS = 1000
-
-
-def get_eps_greedy_action(q_values: np.ndarray, eps: float = 0.05) -> np.integer:
-    if random.uniform(0, 1) < eps or np.all(q_values == q_values[0]):
-        return np.random.choice([a for a in range(len(q_values))])
-    else:
-        return np.argmax(q_values)
 
 
 def sarsa(env: ParametrizedEnv) -> np.ndarray:
