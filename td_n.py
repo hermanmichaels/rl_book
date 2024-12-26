@@ -39,7 +39,6 @@ def sarsa_n(env: ParametrizedEnv, n: int = 3, off_policy: bool = False) -> np.nd
             else get_eps_greedy_action(b[observation], eps=0)
         )
 
-        # assert isinstance(observation, int)
         replay_buffer = [ReplayItem(observation, int(action), 0.0)]
 
         T = 2**31 - 1  # terminal step
