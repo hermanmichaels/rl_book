@@ -9,6 +9,7 @@ from gym_utils import get_observation_action_space
 from td import ALPHA, get_eps_greedy_action
 
 NUM_STEPS = 1000
+NUM_MCTS_ITERATIONS = 1000
 
 
 class ReplayBuffer:
@@ -135,28 +136,34 @@ def prioritized_sweeping(env: ParametrizedEnv) -> np.ndarray:
 
 
 class TreeNode:
-    def __init__(self, parent = None, action = None):
+    def __init__(self, observation = None, parent = None, action = None):
         self.children = []
         self.action = action
         self.parent = parent
         self.visits = 0
-        self.reward = 0
+        self.value = 0
         self.terminal = None
         self.sim_step = parent.sim_step + 1 if parent else 0
+        self.observation = observation
         self.visited = False
     
-    def update(self, reward, terminal):
+    def update(self, observation, reward, terminal):
         self.visited = True
+        self.observation = observation
         self.reward = reward
         self.terminal = terminal
 
 def select_child(node):
-    if any([child.terminal is None for child in node.children]):
-        return node.children[np.random.choice([i for i in range(len(node.children))])]
+    # If any of the child nodes has not been visited yet, first visit these.
+
+    # NOTE: Another option: average value
+    unvisited_children = [child for child in node.children if not child.visited]
+    if unvisited_children:
+        return unvisited_children[np.random.choice([i for i in range(len(unvisited_children))])]
     
     ucb_values = []
     for child in node.children:
-        ucb_values.append(child.reward / child.visits + 1 * np.sqrt(np.log(node.visits) / child.visits)) # because all visits are 1 sometimes
+        ucb_values.append(child.reward / child.visits + 1 * np.sqrt(np.log(node.visits) / child.visits))
 
     ucb_values = np.asarray(ucb_values)
     ucb_values /= np.sum(ucb_values)
@@ -164,11 +171,11 @@ def select_child(node):
     return node.children[np.random.choice([i for i in range(len(node.children))], p=ucb_values)]
 
 def select(env, node):
-    reward = 0
     while node.children:
         node = select_child(node)
-        _, reward, terminated, truncated, _ = env.env.step(node.action)
-        node.update(reward, terminated or truncated)
+        observation, reward, terminated, truncated, _ = env.env.step(node.action)
+        node.update(observation, reward, terminated or truncated)
+        # print(f"S{node.observation}")
 
     return node
 
@@ -176,14 +183,15 @@ def select(env, node):
 def expand(env, node, n):
     node.children = [TreeNode(parent=node, action=i) for i in range(n)]
     expand_idx = random.randint(0, len(node.children) - 1)
-    _, reward, terminated, truncated, _ = env.env.step(node.children[expand_idx].action)
-    node.children[expand_idx].update(reward, terminated or truncated)
+    observation, reward, terminated, truncated, _ = env.env.step(node.children[expand_idx].action)
+    node.children[expand_idx].update(observation, reward, terminated or truncated)
+    # print(f"E{node.children[expand_idx].observation}")
     return node.children[expand_idx]
 
 def backprop(node, reward, gamma):
     reward = reward * gamma
     node.visits += 1
-    node.reward += reward
+    node.value += reward
 
     if node.parent:
         backprop(node.parent, reward, gamma)
@@ -195,11 +203,15 @@ def reset_env(env, actions):
         observation, _, _, _, _= env.env.step(action)
     return observation
 
-def mcts(env: ParametrizedEnv, pi, state, actions) -> np.ndarray:
-    root = TreeNode()
-    _, action_space = get_observation_action_space(env)
+def mcts(env: ParametrizedEnv, pi, actions) -> np.ndarray:
+    observation = reset_env(env, actions)
+    root = TreeNode(observation)
+    observation_space, action_space = get_observation_action_space(env)
+    n = int(np.sqrt(observation_space.n))
 
-    for _ in range(1000):
+    # print(observation_space.n)
+
+    for _ in range(NUM_MCTS_ITERATIONS * 10):
         node = root
         observation = reset_env(env, actions)
 
@@ -211,18 +223,32 @@ def mcts(env: ParametrizedEnv, pi, state, actions) -> np.ndarray:
         terminated = node.terminal
 
         sim_step = node.sim_step
+        # In select / expand we have updated reward, because we want
+        # to backprop also positive reward if already at the goal.
         total_reward = node.reward
+        observation = node.observation
+
+        # print("SIM")
 
         while not terminated and not truncated:
             action = pi[observation]
             observation, reward, terminated, truncated, _= env.env.step(action)
-            print(observation)
-            if observation in [-1]:
-                reward += 1
+            # print(f"{observation} -- {reward}")
+            # TODO: seems to need both reward -0.1, and discounting (bit weird)
             total_reward += reward * env.gamma ** sim_step
-            total_reward -= 0.1
+            total_reward -= 0.01
+            x, y = observation % n, observation // n
+            total_reward += 1 - ((n - x)**2 + (n - y)**2)/(2*n*n)
+            # print(((n - x)**2 + (n - y)**2)/(n*n))
             sim_step += 1
 
         backprop(node, total_reward, env.gamma)
 
-    return np.argmax([child.reward / child.visits for child in root.children])
+
+    print([child.value / child.visits for child in root.children])
+
+    # import ipdb
+    # ipdb.set_trace()
+
+
+    return np.argmax([child.value / child.visits for child in root.children])
