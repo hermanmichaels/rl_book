@@ -1,7 +1,9 @@
 import math
 from dataclasses import dataclass
+from typing import Callable
 
 import numpy as np
+from gymnasium.spaces import Discrete
 
 from env import ParametrizedEnv
 from gym_utils import get_observation_action_space
@@ -16,14 +18,24 @@ class ReplayItem:
 
 
 ALPHA = 0.1
-NUM_STEPS = 1000
 
 
-def sarsa_n(env: ParametrizedEnv, n: int = 3, off_policy: bool = False) -> np.ndarray:
+# TODO:  re-use with TD
+def get_policy(Q, observation_space: Discrete) -> np.ndarray:
+    return np.array([np.argmax(Q[s]) for s in range(observation_space.n)])
+
+
+def sarsa_n(
+    env: ParametrizedEnv,
+    success_cb: Callable[[np.ndarray], bool],
+    max_steps: int,
+    n: int = 3,
+    off_policy: bool = False,
+) -> tuple[bool, np.ndarray, int]:
     observation_space, action_space = get_observation_action_space(env)
     Q = np.zeros((observation_space.n, action_space.n))
 
-    for _ in range(NUM_STEPS):
+    for step in range(max_steps):
         b = (
             np.random.rand(int(observation_space.n), int(action_space.n))
             if off_policy
@@ -99,14 +111,23 @@ def sarsa_n(env: ParametrizedEnv, n: int = 3, off_policy: bool = False) -> np.nd
 
             t += 1
 
-    return np.array([np.argmax(Q[s]) for s in range(observation_space.n)])
+        pi = get_policy(Q, observation_space)
+        if success_cb(pi):
+            return True, pi, step
+
+    return False, get_policy(Q, observation_space), step
 
 
-def tree_n(env: ParametrizedEnv, n: int = 3) -> np.ndarray:
+def tree_n(
+    env: ParametrizedEnv,
+    success_cb: Callable[[np.ndarray], bool],
+    max_steps: int,
+    n: int = 3,
+) -> tuple[bool, np.ndarray, int]:
     observation_space, action_space = get_observation_action_space(env)
     Q = np.zeros((observation_space.n, action_space.n)) + 0.1
 
-    for _ in range(NUM_STEPS):
+    for step in range(max_steps):
         observation, _ = env.env.reset()
         terminated = truncated = False
         action = get_eps_greedy_action(Q[observation])
@@ -173,4 +194,8 @@ def tree_n(env: ParametrizedEnv, n: int = 3) -> np.ndarray:
 
             t += 1
 
-    return np.array([np.argmax(Q[s]) for s in range(observation_space.n)])
+        pi = get_policy(Q, observation_space)
+        if success_cb(pi):
+            return True, pi, step
+
+    return False, get_policy(Q, observation_space), step
