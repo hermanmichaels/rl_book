@@ -2,33 +2,45 @@ import copy
 import random
 import statistics
 from collections import defaultdict
-from typing import Any
+from typing import Any, Callable
 
 import numpy as np
 
 from rl_book.env import ParametrizedEnv
 from rl_book.gym_utils import get_observation_action_space
 
+_cached_functions = []
 
 def call_once(func):
     """Custom cache decorator
-    ignoring the first argument.
+    ignoring the first argument. - TODO
     """
     cache = {}
 
     def wrapper(*args, **kwargs):
-        key = (func.__name__, args[1:])
+        assert isinstance(args[0], ParametrizedEnv), ""
+
+        key = (func.__name__, args[0].env.observation_space.n, args[1:])
         assert not kwargs, "We don't support kwargs atm"
         if key not in cache:
             cache[key] = func(*args)
         return cache[key]
+    
+    def clear_cache():
+        cache.clear()
+
+    wrapper.clear_cache = clear_cache
+    _cached_functions.append(wrapper)
 
     return wrapper
 
+def clear_all_caches():
+    for func in _cached_functions:
+        func.clear_cache()
 
 @call_once
 def generate_possible_states(
-    env: ParametrizedEnv, num_runs: int = 100
+    env: ParametrizedEnv, num_runs: int = 10000
 ) -> list[tuple[int, ParametrizedEnv]]:
     """Generate possible states of an environment.
     For this, iteratively increase the set of already known
@@ -43,6 +55,8 @@ def generate_possible_states(
         list containing found states - which are tuples of states (observations)
         and the gym environment reprsenting that state
     """
+    # import ipdb
+    # ipdb.set_trace()
     _, action_space = get_observation_action_space(env)
 
     observation, _ = env.env.reset()
@@ -79,7 +93,7 @@ def generate_episode(
     env: ParametrizedEnv,
     pi: np.ndarray,
     exploring_starts: bool,
-    max_episode_length: int = 20,
+    max_episode_length: int = 40, # TODO
 ) -> list[tuple[Any, Any, Any]]:
     """Generate an episode following the given policy.
 
@@ -114,20 +128,32 @@ def generate_episode(
             )
         initial_step = False
 
-        observation_new, reward, terminated, truncated, _ = env.env.step(action)
+        if random.randint(0, 100) < -1:
+            action = np.random.choice([a for a in range(action_space.n)])
+
+        observation_new, reward, terminated, truncated, _ = env.step(action, observation)
 
         episode.append((observation, action, reward))
 
         # Terminate episodes in which agent is stuck
         if len(episode) > max_episode_length:
+            ### print("AAAA")
             break
 
         observation = observation_new
 
     return episode
 
+def get_eps_greedy_policy(env, Q, step):
+    b = np.ones_like(Q) * (env.eps(step) / Q.shape[1])
+    optimal_actions = np.argmax(Q, axis=1)
+    b[np.arange(Q.shape[0]), optimal_actions] += 1 - env.eps(step)
+    return b
 
-def mc_es(env: ParametrizedEnv) -> np.ndarray:
+
+def mc_es(
+    env: ParametrizedEnv, success_cb: Callable[[np.ndarray], bool], max_steps: int, eps_decay: bool  = False
+) -> tuple[bool, np.ndarray, int]:
     """Solve passed Gymnasium env via Monte Carlo
     with exploring starts.
 
@@ -137,35 +163,40 @@ def mc_es(env: ParametrizedEnv) -> np.ndarray:
     Returns:
         found policy
     """
+    clear_all_caches()
+
     observation_space, action_space = get_observation_action_space(env)
 
     pi = (
         np.ones((observation_space.n, action_space.n)).astype(np.int32) / action_space.n
     )
     Q = np.zeros((observation_space.n, action_space.n))
+    counts = np.zeros((observation_space.n, action_space.n))
 
-    returns = defaultdict(list)
-    num_steps = 1000
-
-    for t in range(num_steps):
+    for step in range(max_steps):
         episode = generate_episode(env, pi, True)
-
         G = 0.0
         for t in range(len(episode) - 1, -1, -1):
             s, a, r = episode[t]
             G = env.gamma * G + r
             prev_s = [(s, a) for (s, a, _) in episode[:t]]
             if (s, a) not in prev_s:
-                returns[s, a].append(G)
-                Q[s, a] = statistics.fmean(returns[s, a])
+                counts[s, a] += 1
+                Q[s, a] += (G - Q[s, a]) / counts[s, a]
                 if not all(Q[s, a] == Q[s, 0] for a in range(action_space.n)):
                     for a in range(action_space.n):
                         pi[s, a] = 1 if a == np.argmax(Q[s]) else 0
 
-    return np.argmax(pi, 1)
+        p = np.argmax(pi, 1)
+        if success_cb(p, step):
+            return True, p, step
+
+    return False, np.argmax(pi, 1), step
 
 
-def on_policy_mc(env: ParametrizedEnv) -> np.ndarray:
+def on_policy_mc(
+    env: ParametrizedEnv, success_cb: Callable[[np.ndarray], bool], max_steps: int, eps_decay: bool  = False
+) -> tuple[bool, np.ndarray, int]:
     """Solve passed Gymnasium env via on-policy Monte
     Carlo control.
 
@@ -181,11 +212,9 @@ def on_policy_mc(env: ParametrizedEnv) -> np.ndarray:
         np.ones((observation_space.n, action_space.n)).astype(np.int32) / action_space.n
     )
     Q = np.zeros((observation_space.n, action_space.n))
+    counts = np.zeros((observation_space.n, action_space.n))
 
-    returns = defaultdict(list)
-    num_steps = 1000
-
-    for _ in range(num_steps):
+    for step in range(max_steps):
         episode = generate_episode(env, pi, False)
 
         G = 0.0
@@ -194,21 +223,27 @@ def on_policy_mc(env: ParametrizedEnv) -> np.ndarray:
             G = env.gamma * G + r
             prev_s = [(s, a) for (s, a, _) in episode[:t]]
             if (s, a) not in prev_s:
-                returns[s, a].append(G)
-                Q[s, a] = statistics.fmean(returns[s, a])
+                counts[s, a] += 1
+                Q[s, a] += (G - Q[s, a]) / counts[s, a]
                 if not all(Q[s, a] == Q[s, 0] for a in range(action_space.n)):
                     A_star = np.argmax(Q[s, :])
                     for a in range(action_space.n):
                         pi[s, a] = (
-                            1 - env.eps + env.eps / action_space.n
+                            1 - env.eps(step) + env.eps(step) / action_space.n
                             if a == A_star
-                            else env.eps / action_space.n
+                            else env.eps(step) / action_space.n
                         )
 
-    return np.argmax(pi, 1)
+        p = np.argmax(pi, 1)
+        if success_cb(p, step):
+            return True, p, step
+
+    return False, np.argmax(pi, 1), step
 
 
-def off_policy_mc(env: ParametrizedEnv) -> np.ndarray:
+def off_policy_mc(
+    env: ParametrizedEnv, success_cb: Callable[[np.ndarray], bool], max_steps: int, eps_decay: bool  = False
+) -> tuple[bool, np.ndarray, int]:
     """Solve passed Gymnasium env via off-policy Monte
     Carlo control.
 
@@ -224,12 +259,8 @@ def off_policy_mc(env: ParametrizedEnv) -> np.ndarray:
     C = np.zeros((observation_space.n, action_space.n))
     pi = np.argmax(Q, 1)
 
-    num_steps = 1000
-
-    for _ in range(num_steps):
-        b = np.random.rand(int(observation_space.n), int(action_space.n))
-        b = b / np.expand_dims(np.sum(b, axis=1), -1)
-
+    for step in range(max_steps):
+        b = get_eps_greedy_policy(env, Q, step)
         episode = generate_episode(env, b, False)
 
         G = 0.0
@@ -244,10 +275,15 @@ def off_policy_mc(env: ParametrizedEnv) -> np.ndarray:
                 break
             W *= 1 / b[s, a]
 
-    return pi
+        if success_cb(pi, step):
+            return True, pi, step
+
+    return False, pi, step
 
 
-def off_policy_mc_non_inc(env: ParametrizedEnv) -> np.ndarray:
+def off_policy_mc_non_inc(
+    env: ParametrizedEnv, success_cb: Callable[[np.ndarray, str], bool], max_steps: int, eps_decay: bool  = False
+) -> tuple[bool, np.ndarray, int]:
     """Solve passed Gymnasium env via on-policy Monte
     Carlo control - but does not use incremental algorithm
     from Sutton for updating the importance sampling weights.
@@ -262,14 +298,13 @@ def off_policy_mc_non_inc(env: ParametrizedEnv) -> np.ndarray:
 
     Q = np.zeros((observation_space.n, action_space.n))
 
-    num_steps = 10000
     returns = defaultdict(list)
     ratios = defaultdict(list)
 
-    for _ in range(num_steps):
-        b = np.random.rand(int(observation_space.n), int(action_space.n))
-        b = b / np.expand_dims(np.sum(b, axis=1), -1)
-
+    for step in range(max_steps):
+        if step % 100 == 0:
+            print(step)
+        b = get_eps_greedy_policy(env, Q, step)
         episode = generate_episode(env, b, False)
 
         G = 0.0
@@ -297,6 +332,9 @@ def off_policy_mc_non_inc(env: ParametrizedEnv) -> np.ndarray:
                 [s for s in ratios[s, a]]
             )
 
-    Q = np.nan_to_num(Q, nan=0.0)
+        p = np.argmax(Q, 1)
+        if success_cb(p, step):
+            return True, p, step
 
-    return np.argmax(Q, 1)
+    Q = np.nan_to_num(Q, nan=0.0)
+    return False, np.argmax(Q, 1), step

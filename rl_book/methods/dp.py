@@ -1,10 +1,36 @@
+from typing import Callable
+
 import numpy as np
+from gymnasium.spaces import Discrete
 
 from rl_book.env import ParametrizedEnv
 from rl_book.gym_utils import get_observation_action_space
 
 
-def policy_iteration(env: ParametrizedEnv) -> np.ndarray:
+def get_policy(
+    V: np.ndarray,
+    observation_space: Discrete,
+    action_space: Discrete,
+    P: dict, # [dict[list[float, float, float, bool]]], - TODO
+    gamma: float,
+) -> np.ndarray:
+    return np.asarray(
+        [
+            np.argmax(
+                [
+                    p * (r + gamma * V[s_next])
+                    for a in range(action_space.n)
+                    for p, s_next, r, _ in P[s][a]  # type: ignore
+                ]
+            )
+            for s in range(observation_space.n)
+        ]
+    )
+
+
+def policy_iteration(
+    env: ParametrizedEnv, success_cb: Callable[[np.ndarray], bool], max_steps: int
+) -> tuple[bool, np.ndarray, int]:
     """Uses 'Policy Iteration' to solve the RL problem
     specified by the passed Gymnasium env.
 
@@ -38,7 +64,7 @@ def policy_iteration(env: ParametrizedEnv) -> np.ndarray:
                 break
         return V
 
-    while True:
+    for step in range(max_steps):
         V = _policy_evaluation()
 
         policy_stable = True
@@ -54,11 +80,18 @@ def policy_iteration(env: ParametrizedEnv) -> np.ndarray:
             if old_a != pi[s]:
                 policy_stable = False
 
-        if policy_stable:
-            return pi
+        pi = get_policy(V, observation_space, action_space, env.env.P, env.gamma)
+        success = success_cb(pi, step)
+
+        if success:
+            return success, pi, step
+
+    return False, pi, step
 
 
-def value_iteration(env: ParametrizedEnv) -> np.ndarray:
+def value_iteration(
+    env: ParametrizedEnv, success_cb: Callable[[np.ndarray], bool], max_steps: int
+) -> tuple[bool, np.ndarray, int]:
     """Uses 'Value Iteration' to solve the RL problem
     specified by the passed Gymnasium env.
 
@@ -72,7 +105,7 @@ def value_iteration(env: ParametrizedEnv) -> np.ndarray:
 
     V = np.zeros(observation_space.n)
 
-    while True:
+    for step in range(max_steps):
         delta = 0
         for s in range(observation_space.n):
             v = V[s]
@@ -84,18 +117,10 @@ def value_iteration(env: ParametrizedEnv) -> np.ndarray:
                 ]
             )
             delta = max(delta, abs(v - V[s]))
-        if delta < env.eps:
-            break
 
-    return np.asarray(
-        [
-            np.argmax(
-                [
-                    p * (r + env.gamma * V[s_next])
-                    for a in range(action_space.n)
-                    for p, s_next, r, _ in env.env.P[s][a]  # type: ignore
-                ]
-            )
-            for s in range(observation_space.n)
-        ]
-    )
+        pi = get_policy(V, observation_space, action_space, env.env.P, env.gamma)
+        success = success_cb(pi, step)
+        if success:
+            return success, pi, step
+
+    return False, pi, step
