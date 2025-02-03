@@ -1,15 +1,13 @@
 import argparse
 
+from grid_world_utils import find_policy
 import gymnasium as gym
+from gymnasium.core import Env
 
-from dp import policy_iteration, value_iteration
 from env import ParametrizedEnv
-from mc import mc_es, off_policy_mc, off_policy_mc_non_inc, on_policy_mc
-from td import double_q, expected_sarsa, q, sarsa
-from td_n import sarsa_n, tree_n
-from utils import find_policy
+from planning import mcts
 
-GAMMA = 0.97
+GAMMA = 0.9
 EPS = 0.001
 NUM_STEPS = 100
 
@@ -30,7 +28,7 @@ def solve_grid_world(method: str) -> None:
 
     # Find policy
     pi = find_policy(env_train, method)
-    
+
     gym_env_train.close()
 
     gym_env_test = gym.make(
@@ -43,8 +41,11 @@ def solve_grid_world(method: str) -> None:
 
     # Test policy and visualize found solution
     observation, _ = gym_env_test.reset()
+    actions = []
     for _ in range(NUM_STEPS):
         action = pi[observation]
+        action = mcts(env_train, pi, actions)
+        actions.append(action)
         observation, _, terminated, truncated, _ = gym_env_test.step(action)
         if terminated or truncated:
             break
