@@ -36,7 +36,7 @@ def q(env) -> np.ndarray:
     observation_space, action_space = get_observation_action_space(env)
     Q = np.zeros((observation_space.n, action_space.n))
 
-    for _ in range(NUM_STEPS):
+    for _ in range(100):
         observation, _ = env.env.reset()
         terminated = truncated = False
 
