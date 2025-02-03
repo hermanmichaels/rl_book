@@ -27,6 +27,7 @@ def solve_grid_world(method: str) -> None:
     )
     env_train = ParametrizedEnv(gym_env_train, GAMMA, EPS)
 
+    # Find policy
     if method == "policy_iteration":
         pi = policy_iteration(env_train)
     elif method == "value_iteration":

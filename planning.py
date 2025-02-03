@@ -140,34 +140,30 @@ def prioritized_sweeping(env: ParametrizedEnv) -> np.ndarray:
 class TreeNode:
     def __init__(
         self,
-        observation: int | None = None,
         parent: Optional["TreeNode"] = None,
         action: int | None = None,
     ) -> None:
         """Instantiates a tree node.
 
         Args:
-            observation: gym state represented by the node
             parent: parent node
             action: action taken to reach the node
         """
-        self.observation = observation
-        self.terminal: bool | None = None
-        self.reward = 0.
-
         self.action = action
         self.parent = parent
 
         self.children: list["TreeNode"] = []
 
-        self.visits = 0
-        self.reward_sum = 0.
+        self.terminal: bool | None = None
+        self.reward = 0.0
 
-    def update(self, observation: int, terminal: bool, reward: float) -> None:
+        self.visits = 0
+        self.reward_sum = 0.0
+
+    def update(self, terminal: bool, reward: float) -> None:
         """When we visit a node for the first time,
         update all relevant state stats.
         """
-        self.observation = observation
         self.terminal = terminal
         self.reward = reward
 
@@ -203,10 +199,10 @@ def select(env, node: TreeNode) -> TreeNode:
     """
     while node.children:
         node = select_child(node)
-        observation, reward, terminated, truncated, _ = env.step(node.action)
+        _, reward, terminated, truncated, _ = env.step(node.action)
         # If node was not visited yet, update state stats.
         if node.visits == 0:
-            node.update(observation, terminated or truncated, reward)
+            node.update(terminated or truncated, reward)
 
     return node
 
@@ -222,10 +218,10 @@ def expand(env, node: TreeNode, n: int) -> TreeNode:
     """
     node.children = [TreeNode(parent=node, action=i) for i in range(n)]
     expand_idx = random.randint(0, len(node.children) - 1)
-    observation, reward, terminated, truncated, _ = env.env.step(
+    _, reward, terminated, truncated, _ = env.env.step(
         node.children[expand_idx].action
     )
-    node.children[expand_idx].update(observation, terminated or truncated, reward)
+    node.children[expand_idx].update(terminated or truncated, reward)
     return node.children[expand_idx]
 
 
@@ -269,14 +265,14 @@ def mcts(env: ParametrizedEnv, actions: list[int]) -> int:
     Returns:
         best action to take
     """
-    observation = reset_env(env, actions)
-    root = TreeNode(observation)
+    reset_env(env, actions)
+    root = TreeNode()
 
     action_space_n: int = int(get_observation_action_space(env)[1].n)
 
     for _ in range(NUM_MCTS_ITERATIONS):
         node = root
-        observation = reset_env(env, actions)
+        reset_env(env, actions)
 
         # Select nodes until leaf node.
         node = select(env.env, node)
@@ -289,17 +285,16 @@ def mcts(env: ParametrizedEnv, actions: list[int]) -> int:
         truncated = False
         terminated = node.terminal
         total_reward = node.reward
-        obs = node.observation
-        assert obs
-        observation = obs
 
         while not terminated and not truncated:
             # Use a random rollout policy.
             action = random.randint(0, action_space_n - 1)
-            observation, reward, terminated, truncated, _ = env.env.step(action)
+            _, reward, terminated, truncated, _ = env.env.step(action)
             total_reward += float(reward)
 
         # Backprop found reward.
         backprop(node, total_reward, env.gamma)
 
-    return int(np.argmax([child.reward_sum / (child.visits + 1) for child in root.children]))
+    return int(
+        np.argmax([child.reward_sum / (child.visits + 1) for child in root.children])
+    )
