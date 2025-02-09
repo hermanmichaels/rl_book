@@ -74,7 +74,7 @@ def plot_results(needed_steps, methods, min_grid_size, max_grid_size, fig_path):
 
 
 def benchmark(
-    methods, min_grid_size=4, max_grid_size=14, fig_path: str = "result.png"
+    methods, min_grid_size=4, max_grid_size=8, fig_path: str = "result.png"
 ) -> None:
     needed_steps = [[] for _ in range(len(methods))]
 
