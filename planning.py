@@ -1,14 +1,9 @@
 import heapq
 import random
 from collections import defaultdict
-<<<<<<< HEAD
 from typing import Optional
-=======
-from typing import Callable
->>>>>>> fede30a (add benchmarking)
 
 import numpy as np
-from gymnasium.spaces import Discrete
 
 from env import ParametrizedEnv
 from gym_utils import get_observation_action_space
@@ -17,10 +12,6 @@ from td import ALPHA, get_eps_greedy_action
 NUM_STEPS = 1000
 NUM_MCTS_ITERATIONS = 1000
 UCB_EXPLORATION_CONST = 0.01
-
-
-def get_policy(Q, observation_space: Discrete) -> np.ndarray:
-    return np.array([np.argmax(Q[s]) for s in range(observation_space.n)])
 
 
 class ReplayBuffer:
@@ -36,13 +27,7 @@ class ReplayBuffer:
         return self.replay_buffer[random.randint(0, len(self.replay_buffer) - 1)]
 
 
-def dyna_q(
-    env: ParametrizedEnv,
-    success_cb: Callable[[np.ndarray, str], bool],
-    max_steps: int,
-    n=3,
-    plus_mode: bool = False,
-) -> tuple[bool, np.ndarray, int]:
+def dyna_q(env: ParametrizedEnv, n=3, plus_mode: bool = False) -> np.ndarray:
     observation_space, action_space = get_observation_action_space(env)
     Q = np.zeros((observation_space.n, action_space.n))
     model = np.zeros((observation_space.n, action_space.n, 3))
@@ -51,7 +36,7 @@ def dyna_q(
     t = 0
     kappa = 0
 
-    for step in range(max_steps):
+    for _ in range(NUM_STEPS):
         observation, _ = env.env.reset()
         terminated = truncated = False
         action = get_eps_greedy_action(Q[observation])
@@ -79,11 +64,7 @@ def dyna_q(
 
             observation = observation_new
 
-        pi = get_policy(Q, observation_space)
-        if success_cb(pi):
-            return True, pi, step
-
-    return False, get_policy(Q, observation_space), step
+    return np.array([np.argmax(Q[s]) for s in range(observation_space.n)])
 
 
 def generate_predecessor_states(
@@ -108,9 +89,7 @@ def generate_predecessor_states(
     return predecessors
 
 
-def prioritized_sweeping(
-    env: ParametrizedEnv, success_cb: Callable[[np.ndarray, str], bool], max_steps: int
-) -> tuple[bool, np.ndarray, int]:
+def prioritized_sweeping(env: ParametrizedEnv) -> np.ndarray:
     observation_space, action_space = get_observation_action_space(env)
     Q = np.zeros((observation_space.n, action_space.n))
     model = np.zeros((observation_space.n, action_space.n, 2))
@@ -120,7 +99,7 @@ def prioritized_sweeping(
 
     n = 3
 
-    for step in range(max_steps):
+    for _ in range(NUM_STEPS):
         observation, _ = env.env.reset()
         terminated = truncated = False
         action = get_eps_greedy_action(Q[observation])
@@ -155,15 +134,10 @@ def prioritized_sweeping(
 
             observation = observation_new
 
-        pi = get_policy(Q, observation_space)
-        if success_cb(pi):
-            return True, pi, step
-
-    return False, get_policy(Q, observation_space), step
+    return np.array([np.argmax(Q[s]) for s in range(observation_space.n)])
 
 
 class TreeNode:
-<<<<<<< HEAD
     def __init__(
         self,
         parent: Optional["TreeNode"] = None,
@@ -175,10 +149,6 @@ class TreeNode:
             parent: parent node
             action: action taken to reach the node
         """
-=======
-    def __init__(self, observation=None, parent=None, action=None):
-        self.children = []
->>>>>>> fede30a (add benchmarking)
         self.action = action
         self.parent = parent
 
@@ -188,35 +158,18 @@ class TreeNode:
         self.reward = 0.0
 
         self.visits = 0
-<<<<<<< HEAD
         self.reward_sum = 0.0
 
     def update(self, terminal: bool, reward: float) -> None:
         """When we visit a node for the first time,
         update all relevant state stats.
         """
-=======
-        self.value = 0
-        self.terminal = None
-        self.sim_step = parent.sim_step + 1 if parent else 0
-        self.observation = observation
-        self.visited = False
-
-    def update(self, observation, reward, terminal):
-        self.visited = True
-        self.observation = observation
-        self.reward = reward
->>>>>>> fede30a (add benchmarking)
         self.terminal = terminal
         self.reward = reward
 
 
-<<<<<<< HEAD
 def select_child(node: TreeNode) -> TreeNode:
     """Selects a child node."""
-=======
-def select_child(node):
->>>>>>> fede30a (add benchmarking)
     # If any of the child nodes has not been visited yet, first visit these.
     unvisited_children = [child for child in node.children if child.visits == 0]
     if unvisited_children:
@@ -224,34 +177,20 @@ def select_child(node):
             np.random.choice([i for i in range(len(unvisited_children))])
         ]
 
-<<<<<<< HEAD
     # Otherwise, select child according to UCB rule.
     ucb_values = []
     for child in node.children:
         ucb_values.append(
             child.reward_sum / child.visits
             + UCB_EXPLORATION_CONST * np.sqrt(np.log(node.visits) / child.visits)
-=======
-    ucb_values = []
-    for child in node.children:
-        ucb_values.append(
-            child.reward / child.visits
-            + 1 * np.sqrt(np.log(node.visits) / child.visits)
->>>>>>> fede30a (add benchmarking)
         )
 
     ucb_values_np = np.asarray(ucb_values)
     ucb_values_np /= np.sum(ucb_values_np)
 
     return node.children[
-<<<<<<< HEAD
         np.random.choice([i for i in range(len(node.children))], p=ucb_values_np)
     ]
-=======
-        np.random.choice([i for i in range(len(node.children))], p=ucb_values)
-    ]
-
->>>>>>> fede30a (add benchmarking)
 
 
 def select(env, node: TreeNode) -> TreeNode:
@@ -279,7 +218,6 @@ def expand(env, node: TreeNode, n: int) -> TreeNode:
     """
     node.children = [TreeNode(parent=node, action=i) for i in range(n)]
     expand_idx = random.randint(0, len(node.children) - 1)
-<<<<<<< HEAD
     _, reward, terminated, truncated, _ = env.env.step(
         node.children[expand_idx].action
     )
@@ -291,17 +229,6 @@ def backprop(node: TreeNode, reward: float, gamma: float) -> None:
     """Backprops result of MCTS run - i.e. travers all visited
     nodes and updates visit count and reward_sum.
     """
-=======
-    observation, reward, terminated, truncated, _ = env.env.step(
-        node.children[expand_idx].action
-    )
-    node.children[expand_idx].update(observation, reward, terminated or truncated)
-    # print(f"E{node.children[expand_idx].observation}")
-    return node.children[expand_idx]
-
-
-def backprop(node, reward, gamma):
->>>>>>> fede30a (add benchmarking)
     reward = reward * gamma
     node.visits += 1
     node.reward_sum += reward
@@ -327,15 +254,6 @@ def reset_env(env, actions: list[int]) -> int:
         observation, _, _, _, _ = env.env.step(action)
     return observation
 
-<<<<<<< HEAD
-=======
-
-def mcts(env: ParametrizedEnv, pi, actions) -> np.ndarray:
-    observation = reset_env(env, actions)
-    root = TreeNode(observation)
-    observation_space, action_space = get_observation_action_space(env)
-    n = int(np.sqrt(observation_space.n))
->>>>>>> fede30a (add benchmarking)
 
 def mcts(env: ParametrizedEnv, actions: list[int]) -> int:
     """Runs the MCTS algorithm.
@@ -369,36 +287,14 @@ def mcts(env: ParametrizedEnv, actions: list[int]) -> int:
         total_reward = node.reward
 
         while not terminated and not truncated:
-<<<<<<< HEAD
             # Use a random rollout policy.
             action = random.randint(0, action_space_n - 1)
             _, reward, terminated, truncated, _ = env.env.step(action)
             total_reward += float(reward)
-=======
-            action = pi[observation]
-            observation, reward, terminated, truncated, _ = env.env.step(action)
-            # print(f"{observation} -- {reward}")
-            # TODO: seems to need both reward -0.1, and discounting (bit weird)
-            total_reward += reward * env.gamma**sim_step
-            total_reward -= 0.01
-            x, y = observation % n, observation // n
-            total_reward += 1 - ((n - x) ** 2 + (n - y) ** 2) / (2 * n * n)
-            # print(((n - x)**2 + (n - y)**2)/(n*n))
-            sim_step += 1
->>>>>>> fede30a (add benchmarking)
 
         # Backprop found reward.
         backprop(node, total_reward, env.gamma)
 
-<<<<<<< HEAD
     return int(
         np.argmax([child.reward_sum / (child.visits + 1) for child in root.children])
     )
-=======
-    print([child.value / child.visits for child in root.children])
-
-    # import ipdb
-    # ipdb.set_trace()
-
-    return np.argmax([child.value / child.visits for child in root.children])
->>>>>>> fede30a (add benchmarking)
