@@ -1,18 +1,17 @@
 import argparse
 
 import gymnasium as gym
-from gymnasium.envs.toy_text.frozen_lake import generate_random_map
 
 from dp import policy_iteration, value_iteration
 from env import ParametrizedEnv
 from mc import mc_es, off_policy_mc, off_policy_mc_non_inc, on_policy_mc
+from planning import dyna_q, mcts, prioritized_sweeping
 from td import double_q, expected_sarsa, q, sarsa
 from td_n import sarsa_n, tree_n
 
 GAMMA = 0.97
 EPS = 0.001
 NUM_STEPS = 100
-MAX_STEPS = 10000
 
 
 def solve_grid_world(method: str) -> None:
@@ -21,7 +20,10 @@ def solve_grid_world(method: str) -> None:
     Args:
         method: solving method
     """
-    desc = generate_random_map(size=15)
+
+    from gymnasium.envs.toy_text.frozen_lake import generate_random_map
+
+    desc = generate_random_map(size=5)
 
     gym_env_train = gym.make(
         "FrozenLake-v1",
@@ -31,36 +33,10 @@ def solve_grid_world(method: str) -> None:
     )
     env_train = ParametrizedEnv(gym_env_train, GAMMA, EPS)
 
-    def void_cb(x, y):
-        return False
-
     # Find policy
     if method == "policy_iteration":
-        pi = policy_iteration(env_train, void_cb, MAX_STEPS)[1]
-    elif method == "value_iteration":
-        pi = value_iteration(env_train, void_cb, MAX_STEPS)[1]
-    elif method == "mc_es":
-        pi = mc_es(env_train, void_cb, MAX_STEPS)[1]
-    elif method == "on_policy_mc":
-        pi = on_policy_mc(env_train, void_cb, MAX_STEPS)[1]
-    elif method == "off_policy_mc":
-        pi = off_policy_mc(env_train, void_cb, MAX_STEPS)[1]
-    elif method == "off_policy_mc_non_inc":
-        pi = off_policy_mc_non_inc(env_train, void_cb, MAX_STEPS)[1]
-    elif method == "sarsa":
-        pi = sarsa(env_train, void_cb, MAX_STEPS)[1]
-    elif method == "q":
-        pi = q(env_train, void_cb, MAX_STEPS)[1]
-    elif method == "expected_sarsa":
-        pi = expected_sarsa(env_train, void_cb, MAX_STEPS)[1]
-    elif method == "double_q":
-        pi = double_q(env_train, void_cb, MAX_STEPS)[1]
-    elif method == "sarsa_n":
-        pi = sarsa_n(env_train, void_cb, MAX_STEPS)[1]
-    elif method == "tree_n":
-        pi = tree_n(env_train, void_cb, MAX_STEPS)[1]
-    else:
-        raise ValueError(f"Unknown solution method {method}")
+        pi = q(env_train)
+
     gym_env_train.close()
 
     gym_env_test = gym.make(
@@ -71,11 +47,31 @@ def solve_grid_world(method: str) -> None:
         render_mode="human",
     )
 
+    gym_env_train = gym.make(
+        "FrozenLake-v1",
+        # desc=None,
+        desc=desc,
+        # map_name="4x4",
+        is_slippery=False,
+    )
+    env_train = ParametrizedEnv(gym_env_train, 0.9, EPS)
+
     # Test policy and visualize found solution
     observation, _ = gym_env_test.reset()
+
+    print(observation)
+
+    actions = []
+
     for _ in range(NUM_STEPS):
-        action = pi[observation]
+        action = mcts(env_train, pi, actions)
+        actions.append(action)
+        # import random
+        # action = random.randint(0, 3)
         observation, _, terminated, truncated, _ = gym_env_test.step(action)
+        print(f"{action} -> {observation}")
+        # import ipdb
+        # ipdb.set_trace()
         if terminated or truncated:
             break
     gym_env_test.close()

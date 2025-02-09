@@ -2,7 +2,7 @@ import copy
 import random
 import statistics
 from collections import defaultdict
-from typing import Any
+from typing import Any, Callable
 
 import numpy as np
 
@@ -127,7 +127,9 @@ def generate_episode(
     return episode
 
 
-def mc_es(env: ParametrizedEnv) -> np.ndarray:
+def mc_es(
+    env: ParametrizedEnv, success_cb: Callable[[np.ndarray], bool], max_steps: int
+) -> tuple[bool, np.ndarray, int]:
     """Solve passed Gymnasium env via Monte Carlo
     with exploring starts.
 
@@ -145,9 +147,8 @@ def mc_es(env: ParametrizedEnv) -> np.ndarray:
     Q = np.zeros((observation_space.n, action_space.n))
 
     returns = defaultdict(list)
-    num_steps = 1000
 
-    for t in range(num_steps):
+    for t in range(max_steps):
         episode = generate_episode(env, pi, True)
 
         G = 0.0
@@ -162,10 +163,16 @@ def mc_es(env: ParametrizedEnv) -> np.ndarray:
                     for a in range(action_space.n):
                         pi[s, a] = 1 if a == np.argmax(Q[s]) else 0
 
-    return np.argmax(pi, 1)
+        p = np.argmax(pi, 1)
+        if success_cb(p):
+            return True, p, t  # TODO: t = step?
+
+    return False, np.argmax(pi, 1), t
 
 
-def on_policy_mc(env: ParametrizedEnv) -> np.ndarray:
+def on_policy_mc(
+    env: ParametrizedEnv, success_cb: Callable[[np.ndarray], bool], max_steps: int
+) -> tuple[bool, np.ndarray, int]:
     """Solve passed Gymnasium env via on-policy Monte
     Carlo control.
 
@@ -183,9 +190,8 @@ def on_policy_mc(env: ParametrizedEnv) -> np.ndarray:
     Q = np.zeros((observation_space.n, action_space.n))
 
     returns = defaultdict(list)
-    num_steps = 1000
 
-    for _ in range(num_steps):
+    for step in range(max_steps):
         episode = generate_episode(env, pi, False)
 
         G = 0.0
@@ -205,10 +211,16 @@ def on_policy_mc(env: ParametrizedEnv) -> np.ndarray:
                             else env.eps / action_space.n
                         )
 
-    return np.argmax(pi, 1)
+        p = np.argmax(pi, 1)
+        if success_cb(p):
+            return True, p, step
+
+    return False, np.argmax(pi, 1), step
 
 
-def off_policy_mc(env: ParametrizedEnv) -> np.ndarray:
+def off_policy_mc(
+    env: ParametrizedEnv, success_cb: Callable[[np.ndarray], bool], max_steps: int
+) -> tuple[bool, np.ndarray, int]:
     """Solve passed Gymnasium env via off-policy Monte
     Carlo control.
 
@@ -224,9 +236,7 @@ def off_policy_mc(env: ParametrizedEnv) -> np.ndarray:
     C = np.zeros((observation_space.n, action_space.n))
     pi = np.argmax(Q, 1)
 
-    num_steps = 1000
-
-    for _ in range(num_steps):
+    for step in range(max_steps):
         b = np.random.rand(int(observation_space.n), int(action_space.n))
         b = b / np.expand_dims(np.sum(b, axis=1), -1)
 
@@ -244,10 +254,15 @@ def off_policy_mc(env: ParametrizedEnv) -> np.ndarray:
                 break
             W *= 1 / b[s, a]
 
-    return pi
+        if success_cb(pi):
+            return True, pi, step
+
+    return False, pi, step
 
 
-def off_policy_mc_non_inc(env: ParametrizedEnv) -> np.ndarray:
+def off_policy_mc_non_inc(
+    env: ParametrizedEnv, success_cb: Callable[[np.ndarray, str], bool], max_steps: int
+) -> tuple[bool, np.ndarray, int]:
     """Solve passed Gymnasium env via on-policy Monte
     Carlo control - but does not use incremental algorithm
     from Sutton for updating the importance sampling weights.
@@ -262,11 +277,10 @@ def off_policy_mc_non_inc(env: ParametrizedEnv) -> np.ndarray:
 
     Q = np.zeros((observation_space.n, action_space.n))
 
-    num_steps = 10000
     returns = defaultdict(list)
     ratios = defaultdict(list)
 
-    for _ in range(num_steps):
+    for step in range(max_steps):
         b = np.random.rand(int(observation_space.n), int(action_space.n))
         b = b / np.expand_dims(np.sum(b, axis=1), -1)
 
@@ -297,6 +311,9 @@ def off_policy_mc_non_inc(env: ParametrizedEnv) -> np.ndarray:
                 [s for s in ratios[s, a]]
             )
 
-    Q = np.nan_to_num(Q, nan=0.0)
+        p = np.argmax(Q, 1)
+        if success_cb(p):
+            return True, p, step
 
-    return np.argmax(Q, 1)
+    Q = np.nan_to_num(Q, nan=0.0)
+    return False, np.argmax(Q, 1), step
