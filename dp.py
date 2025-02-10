@@ -81,9 +81,9 @@ def policy_iteration(
                 policy_stable = False
 
         pi = get_policy(V, observation_space, action_space, env.env.P, env.gamma)
-        success = success_cb(pi)
+        success = success_cb(pi, step)
 
-        if policy_stable or success:
+        if success:
             return success, pi, step
 
     return False, pi, step
@@ -119,8 +119,8 @@ def value_iteration(
             delta = max(delta, abs(v - V[s]))
 
         pi = get_policy(V, observation_space, action_space, env.env.P, env.gamma)
-        success = success_cb(pi)
-        if delta < 1e-10 or success:
+        success = success_cb(pi, step)
+        if success:
             return success, pi, step
 
     return False, pi, step

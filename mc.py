@@ -9,26 +9,38 @@ import numpy as np
 from env import ParametrizedEnv
 from gym_utils import get_observation_action_space
 
+_cached_functions = []
 
 def call_once(func):
     """Custom cache decorator
-    ignoring the first argument.
+    ignoring the first argument. - TODO
     """
     cache = {}
 
     def wrapper(*args, **kwargs):
-        key = (func.__name__, args[1:])
+        assert isinstance(args[0], ParametrizedEnv), ""
+
+        key = (func.__name__, args[0].env.observation_space.n, args[1:])
         assert not kwargs, "We don't support kwargs atm"
         if key not in cache:
             cache[key] = func(*args)
         return cache[key]
+    
+    def clear_cache():
+        cache.clear()
+
+    wrapper.clear_cache = clear_cache
+    _cached_functions.append(wrapper)
 
     return wrapper
 
+def clear_all_caches():
+    for func in _cached_functions:
+        func.clear_cache()
 
 @call_once
 def generate_possible_states(
-    env: ParametrizedEnv, num_runs: int = 100
+    env: ParametrizedEnv, num_runs: int = 10000
 ) -> list[tuple[int, ParametrizedEnv]]:
     """Generate possible states of an environment.
     For this, iteratively increase the set of already known
@@ -43,6 +55,8 @@ def generate_possible_states(
         list containing found states - which are tuples of states (observations)
         and the gym environment reprsenting that state
     """
+    # import ipdb
+    # ipdb.set_trace()
     _, action_space = get_observation_action_space(env)
 
     observation, _ = env.env.reset()
@@ -60,6 +74,8 @@ def generate_possible_states(
             else:
                 if not terminated and not truncated:
                     possible_states.append((observation, env))
+
+    print(len(possible_states))
 
     return possible_states
 
@@ -79,7 +95,7 @@ def generate_episode(
     env: ParametrizedEnv,
     pi: np.ndarray,
     exploring_starts: bool,
-    max_episode_length: int = 20,
+    max_episode_length: int = 40, # TODO
 ) -> list[tuple[Any, Any, Any]]:
     """Generate an episode following the given policy.
 
@@ -114,7 +130,10 @@ def generate_episode(
             )
         initial_step = False
 
-        observation_new, reward, terminated, truncated, _ = env.env.step(action)
+        if random.randint(0, 100) < -1:
+            action = np.random.choice([a for a in range(action_space.n)])
+
+        observation_new, reward, terminated, truncated, _ = env.step(action)
 
         episode.append((observation, action, reward))
 
@@ -139,35 +158,35 @@ def mc_es(
     Returns:
         found policy
     """
+    clear_all_caches()
+
     observation_space, action_space = get_observation_action_space(env)
 
     pi = (
         np.ones((observation_space.n, action_space.n)).astype(np.int32) / action_space.n
     )
     Q = np.zeros((observation_space.n, action_space.n))
+    counts = np.zeros((observation_space.n, action_space.n))
 
-    returns = defaultdict(list)
-
-    for t in range(max_steps):
+    for step in range(max_steps):
         episode = generate_episode(env, pi, True)
-
         G = 0.0
         for t in range(len(episode) - 1, -1, -1):
             s, a, r = episode[t]
             G = env.gamma * G + r
             prev_s = [(s, a) for (s, a, _) in episode[:t]]
             if (s, a) not in prev_s:
-                returns[s, a].append(G)
-                Q[s, a] = statistics.fmean(returns[s, a])
+                counts[s, a] += 1
+                Q[s, a] += (G - Q[s, a]) / counts[s, a]
                 if not all(Q[s, a] == Q[s, 0] for a in range(action_space.n)):
                     for a in range(action_space.n):
                         pi[s, a] = 1 if a == np.argmax(Q[s]) else 0
 
         p = np.argmax(pi, 1)
-        if success_cb(p):
-            return True, p, t  # TODO: t = step?
+        if success_cb(p, step):
+            return True, p, step
 
-    return False, np.argmax(pi, 1), t
+    return False, np.argmax(pi, 1), step
 
 
 def on_policy_mc(
@@ -188,8 +207,7 @@ def on_policy_mc(
         np.ones((observation_space.n, action_space.n)).astype(np.int32) / action_space.n
     )
     Q = np.zeros((observation_space.n, action_space.n))
-
-    returns = defaultdict(list)
+    counts = np.zeros((observation_space.n, action_space.n))
 
     for step in range(max_steps):
         episode = generate_episode(env, pi, False)
@@ -200,8 +218,8 @@ def on_policy_mc(
             G = env.gamma * G + r
             prev_s = [(s, a) for (s, a, _) in episode[:t]]
             if (s, a) not in prev_s:
-                returns[s, a].append(G)
-                Q[s, a] = statistics.fmean(returns[s, a])
+                counts[s, a] += 1
+                Q[s, a] += (G - Q[s, a]) / counts[s, a]
                 if not all(Q[s, a] == Q[s, 0] for a in range(action_space.n)):
                     A_star = np.argmax(Q[s, :])
                     for a in range(action_space.n):
@@ -212,7 +230,7 @@ def on_policy_mc(
                         )
 
         p = np.argmax(pi, 1)
-        if success_cb(p):
+        if success_cb(p, step):
             return True, p, step
 
     return False, np.argmax(pi, 1), step
@@ -254,7 +272,7 @@ def off_policy_mc(
                 break
             W *= 1 / b[s, a]
 
-        if success_cb(pi):
+        if success_cb(pi, step):
             return True, pi, step
 
     return False, pi, step
@@ -312,7 +330,7 @@ def off_policy_mc_non_inc(
             )
 
         p = np.argmax(Q, 1)
-        if success_cb(p):
+        if success_cb(p, step):
             return True, p, step
 
     Q = np.nan_to_num(Q, nan=0.0)

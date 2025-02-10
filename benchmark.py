@@ -19,18 +19,19 @@ EPS = 0.001
 
 MAX_INFERENCE_STEPS = 1000
 
-MAX_STEPS = [10001, 30001, 100001, 1000001]
+MAX_STEPS = [10000, 30000, 100000]
+# MAX_STEPS = [100, 1000]
 TRIES_PER_STEP = 3
 
 
-def generate_random_env(n: int) -> ParametrizedEnv:
+def generate_random_env(n: int, extra_rewards) -> ParametrizedEnv:
     desc = generate_random_map(size=n)
     gym_env = gym.make(
         "FrozenLake-v1",
         desc=desc,
         is_slippery=False,
     )
-    return ParametrizedEnv(gym_env, GAMMA, EPS)
+    return ParametrizedEnv(gym_env, GAMMA, EPS, intermediate_rewards=extra_rewards)
 
 
 def get_check_frequency(step: int) -> int:
@@ -61,62 +62,90 @@ def plot_results(needed_steps, methods, min_grid_size, max_grid_size, fig_path):
     x_values = [n for n in range(min_grid_size, max_grid_size)]
     markers = ["o", "s", "^", "*"]
 
+    labels = ["baseline", "int. r", "eps decay", "int. r + eps decay"]
     for idx, y_values in enumerate(needed_steps):
         plt.plot(
             x_values,
             y_values,
             marker=markers[idx % len(markers)],
-            label=methods[idx].__name__,
+            label=labels[idx] # methods[idx].__name__,
         )
         plt.legend()
+        # plt.xticks([5, 10, 15, 20, 25])
+        plt.xlabel("Gridworld size")
+        plt.ylabel("Steps needed")
         plt.savefig(fig_path)
     plt.clf()
 
 
 def benchmark(
-    methods, min_grid_size=4, max_grid_size=8, fig_path: str = "result.png"
+    methods, min_grid_size=4, max_grid_size=10, extra_rewards: bool = False, fig_path: str = "result.png"
 ) -> None:
-    needed_steps = [[] for _ in range(len(methods))]
+    steps_needed = [[] for _ in range(len(methods))]
+
+
 
     # Iterate over all possible grid sizes.
     for n in range(min_grid_size, max_grid_size):
         start = time.time()
         # Iterate over all methods.
         for idx, method in enumerate(methods):
+            if idx == 0:
+                extra_rewards = False
+                eps_decay = False
+            elif idx == 1:
+                extra_rewards = True
+                eps_decay = False
+            elif idx == 2:
+                extra_rewards = False
+                eps_decay = True
+            else:
+                extra_rewards = True
+                eps_decay = True
             # For faster results and reduced variance (e.g. unlucky initialization)
             # try increasing maximal number of steps, and run multiple trainings
             # with each threshold - then store the best run.
-            # TODO: plot variance / confidence interval?
+                
+            found_sol = False
             for max_steps in MAX_STEPS:
                 # TODO: name wrong
-                needed_steps_cur_method = []
-                for _ in range(TRIES_PER_STEP):
-                    env = generate_random_env(n)
+                steps_needed_cur = []
+                for _ in range(3):
+                    # TODO: stop if previous run had less steps
+                    env = generate_random_env(n, extra_rewards)
                     # TODO: env param order wrong
                     callback = partial(success_callback, env=env.env)
-                    success, _, step = method(env, callback, max_steps)
-                    if not success:
-                        step = 10000000
-                    if True or success:
-                        needed_steps_cur_method.append(step)
-                        # break # TODO: remove for lesser steps
-                print(needed_steps_cur_method)
-                if needed_steps_cur_method and min(needed_steps_cur_method) != 10000000:
-                    needed_steps[idx].append(min(needed_steps_cur_method))
+                    max_s = max_steps + 1 if not steps_needed_cur else min(steps_needed_cur)
+                    success, _, step = method(env, callback, max_s, eps_decay)
+                    if success:
+                        steps_needed_cur.append(step)
+                if steps_needed_cur:
+                    steps_needed[idx].append(min(steps_needed_cur))
+                    found_sol = True
                     break
+                else:
+                    print(max_steps)
+
+            if not found_sol:
+                steps_needed[idx].append(MAX_STEPS[-1])
+            # TODO: add dummy if no success
+                    
+            print(f"{method} -- {steps_needed_cur}")
+
         # TODO: format
         print(f"Finished benchmarking grid size {n} x {n} in {time.time() - start}s")
 
-    plot_results(needed_steps, methods, min_grid_size, max_grid_size, fig_path)
+    plot_results(steps_needed, methods, min_grid_size, max_grid_size, fig_path)
 
 
 if __name__ == "__main__":
-    # benchmark([policy_iteration, value_iteration], fig_path="res_dp.png")
+    # benchmark([policy_iteration, value_iteration], fig_path="results/dp.png")
     # benchmark(
     #    [mc_es, on_policy_mc, off_policy_mc, off_policy_mc_non_inc],
-    #    fig_path="res_mc.png",
+    #    fig_path="results/mc.png",
     # )
-    benchmark([q], fig_path="res_td.png")
-    # benchmark([sarsa, q, expected_sarsa, double_q], fig_path="res_td.png")
-    # benchmark([sarsa_n, tree_n], fig_path="res_td_n.png")
+    benchmark([q, q, q, q], 9, 17, False, fig_path="results/q.png")
+    # benchmark([q, expected_sarsa, double_q], 4, 1, True, fig_path="results/td.png")
+    # benchmark([sarsa, q, expected_sarsa, double_q], fig_path="results/td.png")
+    # benchmark([sarsa_n, tree_n], 4, 12, True, fig_path="results/td_n_int.png")
     # benchmark([dyna_q, prioritized_sweeping], fig_path="res_planning.png")

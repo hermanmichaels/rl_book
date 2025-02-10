@@ -27,7 +27,7 @@ def sarsa(
         action = get_eps_greedy_action(Q[observation])
 
         while not terminated and not truncated:
-            observation_new, reward, terminated, truncated, _ = env.env.step(action)
+            observation_new, reward, terminated, truncated, _ = env.step(action)
             action_new = get_eps_greedy_action(Q[observation_new])
             q_next = Q[observation_new, action_new] if not terminated else 0
             Q[observation, action] = Q[observation, action] + ALPHA * (
@@ -37,42 +37,50 @@ def sarsa(
             action = action_new
 
         pi = get_policy(Q, observation_space)
-        if success_cb(pi):
+        if success_cb(pi, step):
             return True, pi, step
 
     return False, get_policy(Q, observation_space), step
 
-def get_current_eps(step, eps_start = 1, eps_end = 0.05, num_decay_steps = 10000):
+def get_current_eps(step, eps_start = 1, eps_end = 0.05, num_decay_steps = 1000):
     return max(eps_end, eps_start - step * (eps_start - eps_end) / num_decay_steps)
 
 def q(
-    env, success_cb: Callable[[np.ndarray], bool], max_steps: int
+    env, success_cb: Callable[[np.ndarray], bool], max_steps: int, eps_decay
 ) -> tuple[bool, np.ndarray, int]:
     observation_space, action_space = get_observation_action_space(env)
     Q = np.zeros((observation_space.n, action_space.n))
+
+    first_goal = True
+    step = 0
 
     for step in range(max_steps):
         observation, _ = env.env.reset()
         terminated = truncated = False
 
-        eps = 0.05 # get_current_eps(step)
+        eps = get_current_eps(step) if eps_decay else 0.05
+
+        # print(eps)
 
         c = 0
 
         while not terminated and not truncated:
             action = get_eps_greedy_action(Q[observation], eps)
-            observation_new, reward, terminated, truncated, _ = env.env.step(action)
-            x = observation_new // np.sqrt(observation_space.n)
-            y = observation_new % np.sqrt(observation_space.n)
-            reward += 0.01 * (x / np.sqrt(observation_space.n) + y / np.sqrt(observation_space.n))
+            observation_new, reward, terminated, truncated, _ = env.step(action, observation)
+
+            if first_goal and reward >= 1:
+                print(step)
+                first_goal = False
+
             Q[observation, action] = Q[observation, action] + ALPHA * (
                 reward + env.gamma * np.max(Q[observation_new]) - Q[observation, action]
             )
             observation = observation_new
-            c += 1
 
-            # if c > 1000:
-            #    break
+            c += 1
+            if c > 100:
+                print("XXXXXXXXXXXXXXXX")
+                break
 
         pi = get_policy(Q, observation_space)
         if success_cb(pi, step):
@@ -110,8 +118,10 @@ def expected_sarsa(
         terminated = truncated = False
         action = get_eps_greedy_action(Q[observation])
 
+        c = 0
+
         while not terminated and not truncated:
-            observation_new, reward, terminated, truncated, _ = env.env.step(action)
+            observation_new, reward, terminated, truncated, _ = env.step(action)
             action_new = get_eps_greedy_action(Q[observation_new])
             updated_q_value = Q[observation, action] + ALPHA * (
                 reward - Q[observation, action]
@@ -124,8 +134,12 @@ def expected_sarsa(
 
         if step % 1000 == 0:
             pi = get_policy(Q, observation_space)
-            if success_cb(pi):
+            if success_cb(pi, step):
                 return True, pi, step
+            
+        c += 1
+        if c > 100:
+            break
 
     return False, get_policy(Q, observation_space), step
 
@@ -139,11 +153,20 @@ def double_q(
 
     for step in range(max_steps):
         observation, _ = env.env.reset()
+        episode_states = {observation}
+        episode_states_double = []
+
         terminated = truncated = False
+
+        c = 0
 
         while not terminated and not truncated:
             action = get_eps_greedy_action(Q_1[observation] + Q_2[observation])
-            observation_new, reward, terminated, truncated, _ = env.env.step(action)
+            observation_new, reward, terminated, truncated, _ = env.step(action)
+
+            episode_states.add(observation_new)
+            episode_states_double.append(observation_new)
+
             if random.randint(0, 100) < 50:
                 Q_1[observation, action] = Q_1[observation, action] + ALPHA * (
                     reward
@@ -160,7 +183,16 @@ def double_q(
 
         if step % 1000 == 0:
             pi = get_policy(Q_1, observation_space)
-            if success_cb(pi):
+            if success_cb(pi, step):
                 return True, pi, step
+            
+        c += 1
+        if c > 100:
+            print("XXXXXXX")
+            break
+
+        # print(episode_states_double)
+        # import ipdb
+        # ipdb.set_trace()
 
     return False, get_policy(Q_1, observation_space), step

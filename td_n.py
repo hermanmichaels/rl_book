@@ -62,7 +62,7 @@ def sarsa_n(
         while True:
             if t < T:
                 # While not terminal, continue playing episode.
-                observation_new, reward, terminated, truncated, _ = env.env.step(action)
+                observation_new, reward, terminated, truncated, _ = env.step(action)
                 action_new = get_eps_greedy_action(Q[observation_new])
                 replay_buffer.append(
                     ReplayItem(observation_new, action_new, float(reward))
@@ -112,7 +112,7 @@ def sarsa_n(
             t += 1
 
         pi = get_policy(Q, observation_space)
-        if success_cb(pi):
+        if success_cb(pi, step):
             return True, pi, step
 
     return False, get_policy(Q, observation_space), step
@@ -127,6 +127,7 @@ def tree_n(
     observation_space, action_space = get_observation_action_space(env)
     Q = np.zeros((observation_space.n, action_space.n)) + 0.1
 
+    step = 10000
     for step in range(max_steps):
         observation, _ = env.env.reset()
         terminated = truncated = False
@@ -140,7 +141,7 @@ def tree_n(
 
         while True:
             if t < T:
-                observation_new, reward, terminated, truncated, _ = env.env.step(action)
+                observation_new, reward, terminated, truncated, _ = env.step(action)
                 action_new = get_eps_greedy_action(Q[observation_new])
                 replay_buffer.append(
                     ReplayItem(observation_new, action_new, float(reward))
@@ -195,7 +196,7 @@ def tree_n(
             t += 1
 
         pi = get_policy(Q, observation_space)
-        if success_cb(pi):
+        if success_cb(pi, step):
             return True, pi, step
 
     return False, get_policy(Q, observation_space), step
