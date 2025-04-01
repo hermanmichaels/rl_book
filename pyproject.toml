@@ -1,5 +1,9 @@
 [tool.poetry]
-name = "sutton-book"
+name = "rl-book"
+packages = [
+    { include = "rl_book" }
+]
+
 version = "0.1.0"
 description = "…"
 authors = ["hermanmichaels <hrmnmichaels@gmail.com>"]
@@ -7,7 +11,7 @@ authors = ["hermanmichaels <hrmnmichaels@gmail.com>"]
 [tool.poetry.dependencies]
 python = "3.10"
 matplotlib = "3.5.1"
-mypy = "0.910"
+mypy = "1.15"
 numpy = "1.22.3"
 black = "22.3.0"
 ipdb = "0.13.13"
@@ -16,3 +20,7 @@ isort = "^5.10.1"
 gymnasium = "0.29.1"
 pygame = "2.6.0"
 torch = "2.3.1"
+pytest = "8.3.5"
+[tool.poetry.group.dev.dependencies]
+mypy = "^1.15.0"
+

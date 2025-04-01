@@ -2,11 +2,12 @@ import argparse
 
 import gymnasium as gym
 
-from dp import policy_iteration, value_iteration
-from env import ParametrizedEnv
-from mc import mc_es, off_policy_mc, off_policy_mc_non_inc, on_policy_mc
-from td import double_q, expected_sarsa, q, sarsa
-from td_n import sarsa_n, tree_n
+from rl_book.dp import policy_iteration, value_iteration
+from rl_book.env import ParametrizedEnv
+from rl_book.mc import (mc_es, off_policy_mc, off_policy_mc_non_inc,
+                        on_policy_mc)
+from rl_book.td import double_q, expected_sarsa, q, sarsa
+from rl_book.td_n import sarsa_n, tree_n
 
 GAMMA = 0.97
 EPS = 0.001

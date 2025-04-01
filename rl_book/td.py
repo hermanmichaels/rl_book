@@ -2,9 +2,9 @@ import random
 
 import numpy as np
 
-from env import ParametrizedEnv
-from gym_utils import get_observation_action_space
-from utils import get_eps_greedy_action
+from rl_book.env import ParametrizedEnv
+from rl_book.gym_utils import get_observation_action_space
+from rl_book.utils import get_eps_greedy_action
 
 ALPHA = 0.1
 NUM_STEPS = 1000
@@ -24,7 +24,7 @@ def sarsa(env: ParametrizedEnv) -> np.ndarray:
             action_new = get_eps_greedy_action(Q[observation_new])
             q_next = Q[observation_new, action_new] if not terminated else 0
             Q[observation, action] = Q[observation, action] + ALPHA * (
-                reward + env.gamma * q_next - Q[observation, action]
+                float(reward) + env.gamma * q_next - Q[observation, action]
             )
             observation = observation_new
             action = action_new

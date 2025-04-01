@@ -3,9 +3,9 @@ from dataclasses import dataclass
 
 import numpy as np
 
-from env import ParametrizedEnv
-from gym_utils import get_observation_action_space
-from utils import div_with_zero, get_eps_greedy_action
+from rl_book.env import ParametrizedEnv
+from rl_book.gym_utils import get_observation_action_space
+from rl_book.utils import div_with_zero, get_eps_greedy_action
 
 
 @dataclass
