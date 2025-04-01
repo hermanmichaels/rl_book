@@ -26,4 +26,13 @@ class ParametrizedEnv:
         observation, reward, terminated, truncated, info = self.env.step(action)
         if self.intermediate_rewards:
             reward += self.manhatten_dist(observation) - self.manhatten_dist(old_obs)
+
+        # reward += (observation % 12 - old_obs % 12)
+
+        # if max((observation % 12 - old_obs % 12), 0) > 0:
+        #     import ipdb
+        #     ipdb.set_trace()
+
+        # import ipdb
+        # ipdb.set_trace()
         return observation, reward, terminated, truncated, info

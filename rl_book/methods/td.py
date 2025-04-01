@@ -1,7 +1,7 @@
 import random
 from typing import Callable
 
-from dp import get_policy
+from utils import get_policy
 import numpy as np
 
 from rl_book.env import ParametrizedEnv
@@ -55,15 +55,22 @@ def q(
 
     for step in range(max_steps):
         observation, _ = env.env.reset()
-        terminated = truncated = False
+        terminated = truncated = False # Move to TRUE, remove here (policy.py)
 
         c = 0
+
+        acc_reard = 0
+        obss = []
 
         while not terminated and not truncated:
             action = get_eps_greedy_action(Q[observation], env.eps(step))
             observation_new, reward, terminated, truncated, _ = env.step(action, observation)
+            obss.append(observation)
+
+            acc_reard += reward
 
             if first_goal and reward >= 1:
+                print("######################")
                 print(step)
                 first_goal = False
 
@@ -72,11 +79,23 @@ def q(
             )
             observation = observation_new
 
+            if observation == 47:
+                print("########")
+
+            # import ipdb
+            # ipdb.set_trace()
+
             c += 1
-            if c > 100:
-                print("XXXXXXXXXXXXXXXX")
+            if c > 1000:
+                # print("XXXXXXXXXXXXXXXX")
                 break
 
+        # import ipdb
+        # ipdb.set_trace()
+
+        print(acc_reard)
+
+        # pi = get_policy(Q, observation_space)
         pi = get_policy(Q, observation_space)
         if success_cb(pi, step):
             return True, pi, step
