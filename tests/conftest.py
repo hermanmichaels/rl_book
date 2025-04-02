@@ -1,6 +1,8 @@
-from env import ParametrizedEnv
-import pytest
 import gymnasium as gym
+import pytest
+
+from env import ParametrizedEnv
+
 
 @pytest.fixture
 def env_train() -> ParametrizedEnv:

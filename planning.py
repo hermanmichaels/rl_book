@@ -218,9 +218,7 @@ def expand(env, node: TreeNode, n: int) -> TreeNode:
     """
     node.children = [TreeNode(parent=node, action=i) for i in range(n)]
     expand_idx = random.randint(0, len(node.children) - 1)
-    _, reward, terminated, truncated, _ = env.env.step(
-        node.children[expand_idx].action
-    )
+    _, reward, terminated, truncated, _ = env.env.step(node.children[expand_idx].action)
     node.children[expand_idx].update(terminated or truncated, reward)
     return node.children[expand_idx]
 

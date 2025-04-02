@@ -26,17 +26,17 @@ jobs:
           curl -sSL https://install.python-poetry.org | python3 -
           poetry install
 
-      # - name: Sort imports with isort
-      #   run: poetry run python -m isort .
+      - name: Sort imports with isort
+        run: poetry run python -m isort .
 
-      # - name: Format with black
-      #   run: poetry run python -m black .
+      - name: Format with black
+        run: poetry run python -m black .
 
-      # - name: Lint with flake8
-      #   run: poetry run python -m flake8 .
+      - name: Lint with flake8
+        run: poetry run python -m flake8 .
 
-      # - name: Check types with mypy
-      #   run: poetry run python -m mypy .
+      - name: Check types with mypy
+        run: poetry run python -m mypy .
 
       - name: Run unit tests
         run: poetry run python -m py.test
