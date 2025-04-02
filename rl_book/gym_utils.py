@@ -1,6 +1,6 @@
 from gymnasium.spaces import Discrete
 
-from env import ParametrizedEnv
+from rl_book.env import ParametrizedEnv
 
 
 def get_observation_action_space(env: ParametrizedEnv) -> tuple[Discrete, Discrete]:

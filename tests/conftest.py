@@ -1,7 +1,7 @@
 import gymnasium as gym
 import pytest
 
-from env import ParametrizedEnv
+from rl_book.env import ParametrizedEnv
 
 
 @pytest.fixture

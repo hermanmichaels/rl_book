@@ -2,9 +2,9 @@ import random
 
 import numpy as np
 
-from env import ParametrizedEnv
-from gym_utils import get_observation_action_space
-from utils import get_eps_greedy_action
+from rl_book.env import ParametrizedEnv
+from rl_book.gym_utils import get_observation_action_space
+from rl_book.utils import get_eps_greedy_action
 
 ALPHA = 0.1
 NUM_STEPS = 1000

@@ -1,5 +1,5 @@
 [tool.poetry]
-name = "sutton-book"
+name = "rl_book"
 version = "0.1.0"
 description = "…"
 authors = ["hermanmichaels <hrmnmichaels@gmail.com>"]

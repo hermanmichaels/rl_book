@@ -5,9 +5,9 @@ from typing import Optional
 
 import numpy as np
 
-from env import ParametrizedEnv
-from gym_utils import get_observation_action_space
-from td import ALPHA, get_eps_greedy_action
+from rl_book.env import ParametrizedEnv
+from rl_book.gym_utils import get_observation_action_space
+from rl_book.td import ALPHA, get_eps_greedy_action
 
 NUM_STEPS = 1000
 NUM_MCTS_ITERATIONS = 1000
