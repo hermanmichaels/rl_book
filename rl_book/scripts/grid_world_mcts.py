@@ -1,7 +1,7 @@
 import gymnasium as gym
 
 from rl_book.env import ParametrizedEnv
-from rl_book.planning import mcts
+from rl_book.methods.planning import mcts
 
 GAMMA = 0.9
 EPS = 0.001
