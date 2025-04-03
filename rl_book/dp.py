@@ -1,7 +1,7 @@
 import numpy as np
 
-from env import ParametrizedEnv
-from gym_utils import get_observation_action_space
+from rl_book.env import ParametrizedEnv
+from rl_book.gym_utils import get_observation_action_space
 
 
 def policy_iteration(env: ParametrizedEnv) -> np.ndarray:
