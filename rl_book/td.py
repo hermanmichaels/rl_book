@@ -24,7 +24,7 @@ def sarsa(env: ParametrizedEnv) -> np.ndarray:
             action_new = get_eps_greedy_action(Q[observation_new])
             q_next = Q[observation_new, action_new] if not terminated else 0
             Q[observation, action] = Q[observation, action] + ALPHA * (
-                reward + env.gamma * q_next - Q[observation, action]
+                float(reward) + env.gamma * q_next - Q[observation, action]
             )
             observation = observation_new
             action = action_new

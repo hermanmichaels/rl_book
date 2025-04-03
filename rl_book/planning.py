@@ -48,7 +48,7 @@ def dyna_q(env: ParametrizedEnv, n=3, plus_mode: bool = False) -> np.ndarray:
 
             observation_new, reward, terminated, truncated, _ = env.env.step(action)
             Q[observation, action] = Q[observation, action] + ALPHA * (
-                reward + env.gamma * np.max(Q[observation_new]) - Q[observation, action]
+                float(reward) + env.gamma * np.max(Q[observation_new]) - Q[observation, action]
             )
             model[observation, action] = observation_new, reward, t
 
@@ -57,7 +57,7 @@ def dyna_q(env: ParametrizedEnv, n=3, plus_mode: bool = False) -> np.ndarray:
                 observation_new_sampled, reward, t_last = model[observation, action]
                 bonus_reward = kappa * np.sqrt(t - t_last) if plus_mode else 0.0
                 Q[observation, action] = Q[observation, action] + ALPHA * (
-                    (reward + bonus_reward)
+                    (float(reward) + bonus_reward)
                     + env.gamma * np.max(Q[int(observation_new_sampled)])
                     - Q[observation, action]
                 )
