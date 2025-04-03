@@ -19,4 +19,4 @@ torch = "2.3.1"
 pytest = "8.3.5"
 
 [tool.flake8]
-ignore = ["E203"] # Whitespace before negative indexes
+ignore = ["E203"] # allow black-compatible slice formatting
