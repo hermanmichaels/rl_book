@@ -5,13 +5,14 @@ from gymnasium.spaces import Discrete
 
 from rl_book.env import ParametrizedEnv
 from rl_book.gym_utils import get_observation_action_space
+from rl_book.methods.method_wrapper import with_default_svalues
 
 
 def get_policy(
     V: np.ndarray,
     observation_space: Discrete,
     action_space: Discrete,
-    P: dict, # [dict[list[float, float, float, bool]]], - TODO
+    P: dict,  # [dict[list[float, float, float, bool]]], - TODO
     gamma: float,
 ) -> np.ndarray:
     return np.asarray(
@@ -27,9 +28,9 @@ def get_policy(
         ]
     )
 
-
+@with_default_svalues
 def policy_iteration(
-    env: ParametrizedEnv, success_cb: Callable[[np.ndarray], bool], max_steps: int
+    env: ParametrizedEnv, success_cb: Callable[[np.ndarray, int], bool], max_steps: int
 ) -> tuple[bool, np.ndarray, int]:
     """Uses 'Policy Iteration' to solve the RL problem
     specified by the passed Gymnasium env.
@@ -50,7 +51,7 @@ def policy_iteration(
         """
         V = np.zeros(observation_space.n)
         while True:
-            delta = 0
+            delta = 0.
             for s in range(observation_space.n):
                 v = V[s]
                 V[s] = sum(
@@ -88,9 +89,9 @@ def policy_iteration(
 
     return False, pi, step
 
-
+@with_default_svalues
 def value_iteration(
-    env: ParametrizedEnv, success_cb: Callable[[np.ndarray], bool], max_steps: int
+    env: ParametrizedEnv, success_cb: Callable[[np.ndarray, int], bool], max_steps: int
 ) -> tuple[bool, np.ndarray, int]:
     """Uses 'Value Iteration' to solve the RL problem
     specified by the passed Gymnasium env.

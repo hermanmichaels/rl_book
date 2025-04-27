@@ -7,6 +7,7 @@ from gymnasium.spaces import Discrete
 
 from rl_book.env import ParametrizedEnv
 from rl_book.gym_utils import get_observation_action_space
+from rl_book.methods.method_wrapper import with_default_svalues
 from rl_book.utils import div_with_zero, get_eps_greedy_action
 
 
@@ -24,10 +25,10 @@ ALPHA = 0.1
 def get_policy(Q, observation_space: Discrete) -> np.ndarray:
     return np.array([np.argmax(Q[s]) for s in range(observation_space.n)])
 
-
+@with_default_svalues
 def sarsa_n(
     env: ParametrizedEnv,
-    success_cb: Callable[[np.ndarray], bool],
+    success_cb: Callable[[np.ndarray, int], bool],
     max_steps: int,
     n: int = 3,
     off_policy: bool = False,
@@ -62,7 +63,9 @@ def sarsa_n(
         while True:
             if t < T:
                 # While not terminal, continue playing episode.
-                observation_new, reward, terminated, truncated, _ = env.step(action, observation)
+                observation_new, reward, terminated, truncated, _ = env.step(
+                    action, observation
+                )
                 action_new = get_eps_greedy_action(Q[observation_new], env.eps(step))
                 replay_buffer.append(
                     ReplayItem(observation_new, action_new, float(reward))
@@ -117,10 +120,10 @@ def sarsa_n(
 
     return False, get_policy(Q, observation_space), step
 
-
+@with_default_svalues
 def tree_n(
     env: ParametrizedEnv,
-    success_cb: Callable[[np.ndarray], bool],
+    success_cb: Callable[[np.ndarray, int], bool],
     max_steps: int,
     n: int = 3,
 ) -> tuple[bool, np.ndarray, int]:
@@ -141,7 +144,9 @@ def tree_n(
 
         while True:
             if t < T:
-                observation_new, reward, terminated, truncated, _ = env.step(action, observation)
+                observation_new, reward, terminated, truncated, _ = env.step(
+                    action, observation
+                )
                 action_new = get_eps_greedy_action(Q[observation_new], env.eps(step))
                 replay_buffer.append(
                     ReplayItem(observation_new, action_new, float(reward))

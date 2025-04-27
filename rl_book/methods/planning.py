@@ -28,7 +28,13 @@ class ReplayBuffer:
         return self.replay_buffer[random.randint(0, len(self.replay_buffer) - 1)]
 
 
-def dyna_q(env: ParametrizedEnv, success_cb: Callable[[np.ndarray], bool], max_steps: int, n=3, plus_mode: bool = False) -> np.ndarray:
+def dyna_q(
+    env: ParametrizedEnv,
+    success_cb: Callable[[np.ndarray, int], bool],
+    max_steps: int,
+    n=3,
+    plus_mode: bool = False,
+) -> tuple[bool, np.ndarray, int]:
     observation_space, action_space = get_observation_action_space(env)
     Q = np.zeros((observation_space.n, action_space.n))
     model = np.zeros((observation_space.n, action_space.n, 3))
@@ -39,8 +45,6 @@ def dyna_q(env: ParametrizedEnv, success_cb: Callable[[np.ndarray], bool], max_s
 
     for step in range(max_steps):
         observation, _ = env.env.reset()
-        import ipdb
-        ipdb.set_trace()
         terminated = truncated = False
         action = get_eps_greedy_action(Q[observation], env.eps(step))
 
@@ -49,9 +53,13 @@ def dyna_q(env: ParametrizedEnv, success_cb: Callable[[np.ndarray], bool], max_s
             buffer.push(observation, action)
             t += 1
 
-            observation_new, reward, terminated, truncated, _ = env.step(action, observation)
+            observation_new, reward, terminated, truncated, _ = env.step(
+                action, observation
+            )
             Q[observation, action] = Q[observation, action] + ALPHA * (
-                float(reward) + env.gamma * np.max(Q[observation_new]) - Q[observation, action]
+                float(reward)
+                + env.gamma * np.max(Q[observation_new])
+                - Q[observation, action]
             )
             model[observation, action] = observation_new, reward, t
 
@@ -96,7 +104,9 @@ def generate_predecessor_states(
     return predecessors
 
 
-def prioritized_sweeping(env: ParametrizedEnv, success_cb: Callable[[np.ndarray], bool], max_steps: int) -> np.ndarray:
+def prioritized_sweeping(
+    env: ParametrizedEnv, success_cb: Callable[[np.ndarray, int], bool], max_steps: int
+) -> tuple[bool, np.ndarray, int]:
     observation_space, action_space = get_observation_action_space(env)
     Q = np.zeros((observation_space.n, action_space.n))
     model = np.zeros((observation_space.n, action_space.n, 2))
@@ -113,7 +123,9 @@ def prioritized_sweeping(env: ParametrizedEnv, success_cb: Callable[[np.ndarray]
 
         while not terminated and not truncated:
             action = get_eps_greedy_action(Q[observation], env.eps(step))
-            observation_new, reward, terminated, truncated, _ = env.step(action, observation)
+            observation_new, reward, terminated, truncated, _ = env.step(
+                action, observation
+            )
             model[observation, action] = observation_new, reward
             P = abs(
                 reward + env.gamma * max(Q[observation_new]) - Q[observation, action]

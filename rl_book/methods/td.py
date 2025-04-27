@@ -5,16 +5,14 @@ import numpy as np
 
 from rl_book.env import ParametrizedEnv
 from rl_book.gym_utils import get_observation_action_space
+from rl_book.methods.method_wrapper import with_default_svalues
 from rl_book.utils import get_eps_greedy_action, get_policy
 
 ALPHA = 0.1
 
-
-
-
-
+@with_default_svalues
 def sarsa(
-    env: ParametrizedEnv, success_cb: Callable[[np.ndarray], bool], max_steps: int
+    env: ParametrizedEnv, success_cb: Callable[[np.ndarray, int], bool], max_steps: int
 ) -> tuple[bool, np.ndarray, int]:
     observation_space, action_space = get_observation_action_space(env)
     Q = np.zeros((observation_space.n, action_space.n))
@@ -28,7 +26,9 @@ def sarsa(
         action = get_eps_greedy_action(Q[observation], eps)
 
         while not terminated and not truncated:
-            observation_new, reward, terminated, truncated, _ = env.step(action, observation)
+            observation_new, reward, terminated, truncated, _ = env.step(
+                action, observation
+            )
             action_new = get_eps_greedy_action(Q[observation_new], eps)
             q_next = Q[observation_new, action_new] if not terminated else 0
             Q[observation, action] = Q[observation, action] + ALPHA * (
@@ -43,8 +43,9 @@ def sarsa(
 
     return False, get_policy(Q, observation_space), step
 
+@with_default_svalues
 def q(
-    env, success_cb: Callable[[np.ndarray], bool], max_steps: int
+    env, success_cb: Callable[[np.ndarray, int], bool], max_steps: int
 ) -> tuple[bool, np.ndarray, int]:
     observation_space, action_space = get_observation_action_space(env)
     Q = np.zeros((observation_space.n, action_space.n))
@@ -60,7 +61,9 @@ def q(
 
         while not terminated and not truncated:
             action = get_eps_greedy_action(Q[observation], env.eps(step))
-            observation_new, reward, terminated, truncated, _ = env.step(action, observation)
+            observation_new, reward, terminated, truncated, _ = env.step(
+                action, observation
+            )
 
             # print(reward)
 
@@ -87,20 +90,9 @@ def q(
 
     return False, get_policy(Q, observation_space), step
 
-#### Results Q
-# 1. q zeros, 1000 steps, extra reward, eps decay
-# 2. q zeros, 1000 steps, eps decay - seemed much slower, crashed on viz (maybe no sucess?)
-# 3. q zeros, 1000 steps, extra reward
-# 4. q ones, 1000 steps, extra reward - very slow, killed
-# 5. q rand, 1000 steps, extra reward - very slow
-# 6. q zeros, extra reward
-
-# TODO: why is zeros so good and ones so bad - shoudlnt optimistic init be good? Relationship to eps decay?
-
-
-
+@with_default_svalues
 def expected_sarsa(
-    env: ParametrizedEnv, success_cb: Callable[[np.ndarray], bool], max_steps: int
+    env: ParametrizedEnv, success_cb: Callable[[np.ndarray, int], bool], max_steps: int
 ) -> tuple[bool, np.ndarray, int]:
     observation_space, action_space = get_observation_action_space(env)
     Q = np.zeros((observation_space.n, action_space.n))
@@ -120,7 +112,9 @@ def expected_sarsa(
         c = 0
 
         while not terminated and not truncated:
-            observation_new, reward, terminated, truncated, _ = env.step(action, observation)
+            observation_new, reward, terminated, truncated, _ = env.step(
+                action, observation
+            )
             action_new = get_eps_greedy_action(Q[observation_new])
             updated_q_value = Q[observation, action] + ALPHA * (
                 reward - Q[observation, action]
@@ -134,16 +128,16 @@ def expected_sarsa(
         pi = get_policy(Q, observation_space)
         if success_cb(pi, step):
             return True, pi, step
-            
+
         c += 1
         if c > 100:
             break
 
     return False, get_policy(Q, observation_space), step
 
-
+@with_default_svalues
 def double_q(
-    env, success_cb: Callable[[np.ndarray], bool], max_steps: int
+    env, success_cb: Callable[[np.ndarray, int], bool], max_steps: int
 ) -> tuple[bool, np.ndarray, int]:
     observation_space, action_space = get_observation_action_space(env)
     Q_1 = np.zeros((observation_space.n, action_space.n))
@@ -156,7 +150,9 @@ def double_q(
 
         while not terminated and not truncated:
             action = get_eps_greedy_action(Q_1[observation], env.eps(step))
-            observation_new, reward, terminated, truncated, _ = env.step(action, observation)
+            observation_new, reward, terminated, truncated, _ = env.step(
+                action, observation
+            )
 
             if random.randint(0, 100) < 50:
                 Q_1[observation, action] = Q_1[observation, action] + ALPHA * (
@@ -175,5 +171,5 @@ def double_q(
         pi = get_policy(Q_1, observation_space)
         if success_cb(pi, step):
             return True, pi, step
-            
+
     return False, get_policy(Q_1, observation_space), step

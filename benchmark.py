@@ -5,6 +5,7 @@ import gymnasium as gym
 import matplotlib.pyplot as plt
 import numpy as np
 from gymnasium.envs.toy_text.frozen_lake import generate_random_map
+from gymnasium.core import Env
 
 from rl_book.env import ParametrizedEnv
 from rl_book.methods.mc import mc_es, off_policy_mc, on_policy_mc
@@ -25,12 +26,11 @@ TRIES_PER_STEP = 3
 def generate_random_env(n: int, extra_rewards, eps_decay) -> ParametrizedEnv:
     desc = generate_random_map(size=n)
     gym_env = gym.make(
-        "FrozenLake-v1",
-        desc=desc,
-        is_slippery=False,
-        render_mode="human"
+        "FrozenLake-v1", desc=desc, is_slippery=False, render_mode="human"
     )
-    return ParametrizedEnv(gym_env, GAMMA, intermediate_rewards=extra_rewards, eps_decay=eps_decay)
+    return ParametrizedEnv(
+        gym_env, GAMMA, intermediate_rewards=extra_rewards, eps_decay=eps_decay
+    )
 
 
 def get_check_frequency(step: int) -> int:
@@ -42,7 +42,7 @@ def get_check_frequency(step: int) -> int:
         return 10000
 
 
-def success_callback(pi: np.ndarray, step: int, env: ParametrizedEnv) -> bool:
+def success_callback(pi: np.ndarray, step: int, env: Env) -> bool:
     if step % get_check_frequency(step) != 0:
         return False
 
@@ -78,9 +78,14 @@ def plot_results(needed_steps, methods, min_grid_size, max_grid_size, fig_path):
 
 
 def benchmark(
-    methods, min_grid_size=4, max_grid_size=10, extra_rewards: bool = False, eps_decay: bool = False, fig_path: str = "result.png"
+    methods,
+    min_grid_size=4,
+    max_grid_size=10,
+    extra_rewards: bool = False,
+    eps_decay: bool = False,
+    fig_path: str = "result.png",
 ) -> None:
-    steps_needed = [[] for _ in range(len(methods))]
+    steps_needed: list[list[int]] = [[] for _ in range(len(methods))]
 
     # Iterate over all possible grid sizes.
     for n in range(min_grid_size, max_grid_size):
@@ -99,7 +104,11 @@ def benchmark(
                     env = generate_random_env(n, extra_rewards, eps_decay)
                     # TODO: env param order wrong
                     callback = partial(success_callback, env=env.env)
-                    max_s = max_steps + 1 if not steps_needed_cur else max(1, min(steps_needed_cur))
+                    max_s = (
+                        max_steps + 1
+                        if not steps_needed_cur
+                        else max(1, min(steps_needed_cur))
+                    )
                     success, _, step = method(env, callback, max_s)
                     if success:
                         steps_needed_cur.append(step)
@@ -111,7 +120,7 @@ def benchmark(
             if not found_sol:
                 steps_needed[idx].append(MAX_STEPS[-1])
             # TODO: add dummy if no success
-                    
+
             print(f"{method} -- {steps_needed_cur}")
 
         # TODO: format
@@ -136,4 +145,11 @@ if __name__ == "__main__":
     # benchmark([sarsa, q, double_q], 5, 26, True, True, fig_path="results/td.png")
     # benchmark([sarsa_n, tree_n], 5, 16, False, False, fig_path="results/td_n_.png")
     # benchmark([sarsa_n, tree_n], 5, 16, True, True, fig_path="results/td_n_true.png")
-    benchmark([dyna_q, prioritized_sweeping], 50, 51, False, False, fig_path="results/planning.png")
+    benchmark(
+        [dyna_q, prioritized_sweeping],
+        50,
+        51,
+        False,
+        False,
+        fig_path="results/planning.png",
+    )

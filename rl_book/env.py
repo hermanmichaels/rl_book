@@ -1,6 +1,6 @@
 from dataclasses import dataclass
-import numpy as np
 
+import numpy as np
 from gymnasium.core import Env
 
 
@@ -15,7 +15,15 @@ class ParametrizedEnv:
     eps_decay: bool = False
 
     def eps(self, step) -> float:
-        return self._eps_end if not self.eps_decay else max(self._eps_end, self._eps_start - step * (self._eps_start - self._eps_end) / self._num_decay_steps)
+        return (
+            self._eps_end
+            if not self.eps_decay
+            else max(
+                self._eps_end,
+                self._eps_start
+                - step * (self._eps_start - self._eps_end) / self._num_decay_steps,
+            )
+        )
 
     # TODO: name?
     def manhatten_dist(self, observation):

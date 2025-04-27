@@ -8,8 +8,10 @@ import numpy as np
 
 from rl_book.env import ParametrizedEnv
 from rl_book.gym_utils import get_observation_action_space
+from rl_book.methods.method_wrapper import with_default_svalues
 
 _cached_functions = []
+
 
 def call_once(func):
     """Custom cache decorator
@@ -25,7 +27,7 @@ def call_once(func):
         if key not in cache:
             cache[key] = func(*args)
         return cache[key]
-    
+
     def clear_cache():
         cache.clear()
 
@@ -34,9 +36,11 @@ def call_once(func):
 
     return wrapper
 
+
 def clear_all_caches():
     for func in _cached_functions:
         func.clear_cache()
+
 
 @call_once
 def generate_possible_states(
@@ -93,7 +97,7 @@ def generate_episode(
     env: ParametrizedEnv,
     pi: np.ndarray,
     exploring_starts: bool,
-    max_episode_length: int = 40, # TODO
+    max_episode_length: int = 40,  # TODO
 ) -> list[tuple[Any, Any, Any]]:
     """Generate an episode following the given policy.
 
@@ -131,7 +135,9 @@ def generate_episode(
         if random.randint(0, 100) < -1:
             action = np.random.choice([a for a in range(action_space.n)])
 
-        observation_new, reward, terminated, truncated, _ = env.step(action, observation)
+        observation_new, reward, terminated, truncated, _ = env.step(
+            action, observation
+        )
 
         episode.append((observation, action, reward))
 
@@ -144,15 +150,19 @@ def generate_episode(
 
     return episode
 
+
 def get_eps_greedy_policy(env, Q, step):
     b = np.ones_like(Q) * (env.eps(step) / Q.shape[1])
     optimal_actions = np.argmax(Q, axis=1)
     b[np.arange(Q.shape[0]), optimal_actions] += 1 - env.eps(step)
     return b
 
-
+@with_default_svalues
 def mc_es(
-    env: ParametrizedEnv, success_cb: Callable[[np.ndarray], bool], max_steps: int, eps_decay: bool  = False
+    env: ParametrizedEnv,
+    success_cb: Callable[[np.ndarray, int], bool],
+    max_steps: int,
+    eps_decay: bool = False,
 ) -> tuple[bool, np.ndarray, int]:
     """Solve passed Gymnasium env via Monte Carlo
     with exploring starts.
@@ -193,9 +203,12 @@ def mc_es(
 
     return False, np.argmax(pi, 1), step
 
-
+@with_default_svalues
 def on_policy_mc(
-    env: ParametrizedEnv, success_cb: Callable[[np.ndarray], bool], max_steps: int, eps_decay: bool  = False
+    env: ParametrizedEnv,
+    success_cb: Callable[[np.ndarray, int], bool],
+    max_steps: int,
+    eps_decay: bool = False,
 ) -> tuple[bool, np.ndarray, int]:
     """Solve passed Gymnasium env via on-policy Monte
     Carlo control.
@@ -240,9 +253,12 @@ def on_policy_mc(
 
     return False, np.argmax(pi, 1), step
 
-
+@with_default_svalues
 def off_policy_mc(
-    env: ParametrizedEnv, success_cb: Callable[[np.ndarray], bool], max_steps: int, eps_decay: bool  = False
+    env: ParametrizedEnv,
+    success_cb: Callable[[np.ndarray, int], bool],
+    max_steps: int,
+    eps_decay: bool = False,
 ) -> tuple[bool, np.ndarray, int]:
     """Solve passed Gymnasium env via off-policy Monte
     Carlo control.
@@ -280,9 +296,12 @@ def off_policy_mc(
 
     return False, pi, step
 
-
+@with_default_svalues
 def off_policy_mc_non_inc(
-    env: ParametrizedEnv, success_cb: Callable[[np.ndarray, str], bool], max_steps: int, eps_decay: bool  = False
+    env: ParametrizedEnv,
+    success_cb: Callable[[np.ndarray, int], bool],
+    max_steps: int,
+    eps_decay: bool = False,
 ) -> tuple[bool, np.ndarray, int]:
     """Solve passed Gymnasium env via on-policy Monte
     Carlo control - but does not use incremental algorithm
