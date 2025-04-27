@@ -7,6 +7,7 @@ import numpy as np
 from gymnasium.envs.toy_text.frozen_lake import generate_random_map
 
 from rl_book.env import ParametrizedEnv
+from rl_book.methods.dp import value_iteration
 from rl_book.methods.mc import mc_es, off_policy_mc, on_policy_mc
 from rl_book.methods.planning import dyna_q, prioritized_sweeping
 from rl_book.methods.td import double_q, expected_sarsa, q, sarsa
@@ -17,7 +18,7 @@ GAMMA = 0.97
 
 MAX_INFERENCE_STEPS = 1000
 
-MAX_STEPS = [10000, 30000, 100000]
+MAX_STEPS = [10000, 30000, 100000, 200000]
 # MAX_STEPS = [100, 1000]
 TRIES_PER_STEP = 3
 
@@ -28,7 +29,7 @@ def generate_random_env(n: int, extra_rewards, eps_decay) -> ParametrizedEnv:
         "FrozenLake-v1",
         desc=desc,
         is_slippery=False,
-        render_mode="human"
+        # render_mode="human"
     )
     return ParametrizedEnv(gym_env, GAMMA, intermediate_rewards=extra_rewards, eps_decay=eps_decay)
 
@@ -58,7 +59,7 @@ def success_callback(pi: np.ndarray, step: int, env: ParametrizedEnv) -> bool:
 
 
 def plot_results(needed_steps, methods, min_grid_size, max_grid_size, fig_path):
-    x_values = [n for n in range(min_grid_size, max_grid_size)]
+    x_values = [n for n in range(10, 51, 10)]
     markers = ["o", "s", "^", "*"]
 
     labels = ["baseline", "int. r", "eps decay", "int. r + eps decay"]
@@ -70,7 +71,7 @@ def plot_results(needed_steps, methods, min_grid_size, max_grid_size, fig_path):
             label=methods[idx].__name__,
         )
         plt.legend()
-        plt.xticks([5, 10, 15])
+        plt.xticks([10, 20, 30, 40, 50])
         plt.xlabel("Gridworld size")
         plt.ylabel("Steps needed")
         plt.savefig(fig_path)
@@ -83,7 +84,7 @@ def benchmark(
     steps_needed = [[] for _ in range(len(methods))]
 
     # Iterate over all possible grid sizes.
-    for n in range(min_grid_size, max_grid_size):
+    for n in range(10, 51, 10):
         start = time.time()
         # Iterate over all methods.
         for idx, method in enumerate(methods):
@@ -99,17 +100,18 @@ def benchmark(
                     env = generate_random_env(n, extra_rewards, eps_decay)
                     # TODO: env param order wrong
                     callback = partial(success_callback, env=env.env)
-                    max_s = max_steps + 1 if not steps_needed_cur else max(1, min(steps_needed_cur))
+                    max_s = max_steps + 1 if not steps_needed_cur else max(1, min([step for step, _ in steps_needed_cur]))
+                    ss = time.time()
                     success, _, step = method(env, callback, max_s)
                     if success:
-                        steps_needed_cur.append(step)
+                        steps_needed_cur.append((step, time.time() - ss))
                 if steps_needed_cur:
-                    steps_needed[idx].append(min(steps_needed_cur))
+                    steps_needed[idx].append(steps_needed_cur)
                     found_sol = True
                     break
 
             if not found_sol:
-                steps_needed[idx].append(MAX_STEPS[-1])
+                steps_needed[idx].append((MAX_STEPS[-1], 0))
             # TODO: add dummy if no success
                     
             print(f"{method} -- {steps_needed_cur}")
@@ -122,18 +124,7 @@ def benchmark(
 
 if __name__ == "__main__":
     # benchmark([policy_iteration, value_iteration], fig_path="results/dp.png")
-    # benchmark(
-    #    [mc_es, on_policy_mc, off_policy_mc], 5, 16, False, False,
-    #    fig_path="results/mc.png",
-    # )
-    # benchmark(
-    #    [mc_es, on_policy_mc, off_policy_mc], 5, 16, True, True,
-    #    fig_path="results/mc-true.png",
-    # )
-    # benchmark([q, q, q, q], 9, 17, False, fig_path="results/q.png")
-    # benchmark([sarsa, q, expected_sarsa, double_q], 5, 16, False, False, fig_path="results/td.png")
-    # benchmark([sarsa, q, expected_sarsa, double_q], 5, 16, True, True, fig_path="results/td-true.png")
-    # benchmark([sarsa, q, double_q], 5, 26, True, True, fig_path="results/td.png")
-    # benchmark([sarsa_n, tree_n], 5, 16, False, False, fig_path="results/td_n_.png")
-    # benchmark([sarsa_n, tree_n], 5, 16, True, True, fig_path="results/td_n_true.png")
-    benchmark([dyna_q, prioritized_sweeping], 50, 51, False, False, fig_path="results/planning.png")
+    benchmark(
+       [value_iteration, on_policy_mc, q, sarsa_n, dyna_q], 10, 51, True, True,
+       fig_path="results/all.png",
+    )

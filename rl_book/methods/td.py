@@ -1,12 +1,11 @@
 import random
 from typing import Callable
 
-from dp import get_policy
 import numpy as np
 
 from rl_book.env import ParametrizedEnv
 from rl_book.gym_utils import get_observation_action_space
-from rl_book.utils import get_eps_greedy_action
+from rl_book.utils import get_eps_greedy_action, get_policy
 
 ALPHA = 0.1
 
@@ -63,8 +62,10 @@ def q(
             action = get_eps_greedy_action(Q[observation], env.eps(step))
             observation_new, reward, terminated, truncated, _ = env.step(action, observation)
 
+            # print(reward)
+
             if first_goal and reward >= 1:
-                print(step)
+                # print(step)
                 first_goal = False
 
             Q[observation, action] = Q[observation, action] + ALPHA * (
@@ -73,9 +74,12 @@ def q(
             observation = observation_new
 
             c += 1
-            if c > 100:
+            if c > 500:
                 print("XXXXXXXXXXXXXXXX")
                 break
+
+        # import ipdb
+        # ipdb.set_trace()
 
         pi = get_policy(Q, observation_space)
         if success_cb(pi, step):

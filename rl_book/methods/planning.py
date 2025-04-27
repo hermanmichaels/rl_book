@@ -8,6 +8,7 @@ import numpy as np
 from rl_book.env import ParametrizedEnv
 from rl_book.gym_utils import get_observation_action_space
 from rl_book.methods.td import ALPHA, get_eps_greedy_action
+from rl_book.utils import get_policy
 
 NUM_STEPS = 1000
 NUM_MCTS_ITERATIONS = 1000
@@ -38,6 +39,8 @@ def dyna_q(env: ParametrizedEnv, success_cb: Callable[[np.ndarray], bool], max_s
 
     for step in range(max_steps):
         observation, _ = env.env.reset()
+        import ipdb
+        ipdb.set_trace()
         terminated = truncated = False
         action = get_eps_greedy_action(Q[observation], env.eps(step))
 

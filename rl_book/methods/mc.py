@@ -302,8 +302,6 @@ def off_policy_mc_non_inc(
     ratios = defaultdict(list)
 
     for step in range(max_steps):
-        if step % 100 == 0:
-            print(step)
         b = get_eps_greedy_policy(env, Q, step)
         episode = generate_episode(env, b, False)
 
