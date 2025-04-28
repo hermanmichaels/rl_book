@@ -139,7 +139,7 @@ def generate_episode(
 
         episode.append((observation, action, reward))
 
-        # Terminate episodes in which agent is liekly stuck
+        # Terminate episodes in which agent is likely stuck
         if len(episode) > max_episode_length:
             break
 

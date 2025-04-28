@@ -19,7 +19,7 @@ GAMMA = 0.97
 
 MAX_INFERENCE_STEPS = 1000
 
-MAX_STEPS = [10000, 30000, 100000]
+MAX_STEPS = [10000, 30000, 100000, 200000]
 TRIES_PER_STEP = 3
 
 
@@ -90,7 +90,7 @@ def benchmark(
     steps_needed: list[list[int]] = [[] for _ in range(len(methods))]
 
     # Iterate over all possible grid sizes.
-    for n in range(min_grid_size, max_grid_size):
+    for n in range(10, 51, 10):
         start = time.time()
         # Iterate over all methods.
         for idx, method in enumerate(methods):
@@ -111,11 +111,13 @@ def benchmark(
                         if not steps_needed_cur
                         else max(1, min(steps_needed_cur))
                     )
+                    start = time.time()
                     success, _, step = method(env, callback, max_s)
                     if success:
                         steps_needed_cur.append(step)
+                    print(time.time() - start)
                 if steps_needed_cur:
-                    steps_needed[idx].append(min(steps_needed_cur))
+                    steps_needed[idx].append(steps_needed_cur)
                     found_sol = True
                     break
 
@@ -134,7 +136,7 @@ def benchmark(
 if __name__ == "__main__":
     # benchmark([policy_iteration, value_iteration], fig_path="results/dp.png")
     benchmark(
-        [on_policy_mc, off_policy_mc],
+        [on_policy_mc],
         5,
         26,
         True,
