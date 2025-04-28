@@ -61,5 +61,7 @@ class ParametrizedEnv:
         """
         observation, reward, terminated, truncated, info = self.env.step(action)
         if self.intermediate_rewards:
-            reward += self.normalized_grid_position_sum(observation) - self.normalized_grid_position_sum(old_obs)
+            reward += self.normalized_grid_position_sum(
+                observation
+            ) - self.normalized_grid_position_sum(old_obs)
         return observation, reward, terminated, truncated, info

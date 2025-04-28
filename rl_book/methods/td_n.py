@@ -7,7 +7,7 @@ from gymnasium.spaces import Discrete
 
 from rl_book.env import ParametrizedEnv
 from rl_book.gym_utils import get_observation_action_space
-from rl_book.methods.method_wrapper import with_default_svalues
+from rl_book.methods.method_wrapper import with_default_values
 from rl_book.utils import div_with_zero, get_eps_greedy_action
 
 
@@ -25,7 +25,8 @@ ALPHA = 0.1
 def get_policy(Q, observation_space: Discrete) -> np.ndarray:
     return np.array([np.argmax(Q[s]) for s in range(observation_space.n)])
 
-@with_default_svalues
+
+@with_default_values
 def sarsa_n(
     env: ParametrizedEnv,
     success_cb: Callable[[np.ndarray, int], bool],
@@ -120,7 +121,8 @@ def sarsa_n(
 
     return False, get_policy(Q, observation_space), step
 
-@with_default_svalues
+
+@with_default_values
 def tree_n(
     env: ParametrizedEnv,
     success_cb: Callable[[np.ndarray, int], bool],

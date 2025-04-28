@@ -8,14 +8,15 @@ import numpy as np
 
 from rl_book.env import ParametrizedEnv
 from rl_book.gym_utils import get_observation_action_space
-from rl_book.methods.method_wrapper import with_default_svalues
+from rl_book.methods.method_wrapper import with_default_values
 
 _cached_functions = []
 
 
 def call_once(func):
     """Custom cache decorator
-    ignoring the first argument. - TODO
+    treating the first argument (env)
+    in a special way (key is env.n-{args[1:]}).
     """
     cache = {}
 
@@ -59,8 +60,6 @@ def generate_possible_states(
         list containing found states - which are tuples of states (observations)
         and the gym environment reprsenting that state
     """
-    # import ipdb
-    # ipdb.set_trace()
     _, action_space = get_observation_action_space(env)
 
     observation, _ = env.env.reset()
@@ -97,7 +96,7 @@ def generate_episode(
     env: ParametrizedEnv,
     pi: np.ndarray,
     exploring_starts: bool,
-    max_episode_length: int = 40,  # TODO
+    max_episode_length: int = 400,
 ) -> list[tuple[Any, Any, Any]]:
     """Generate an episode following the given policy.
 
@@ -132,18 +131,14 @@ def generate_episode(
             )
         initial_step = False
 
-        if random.randint(0, 100) < -1:
-            action = np.random.choice([a for a in range(action_space.n)])
-
         observation_new, reward, terminated, truncated, _ = env.step(
             action, observation
         )
 
         episode.append((observation, action, reward))
 
-        # Terminate episodes in which agent is stuck
+        # Terminate episodes in which agent is liekly stuck
         if len(episode) > max_episode_length:
-            ### print("AAAA")
             break
 
         observation = observation_new
@@ -157,7 +152,8 @@ def get_eps_greedy_policy(env, Q, step):
     b[np.arange(Q.shape[0]), optimal_actions] += 1 - env.eps(step)
     return b
 
-@with_default_svalues
+
+@with_default_values
 def mc_es(
     env: ParametrizedEnv,
     success_cb: Callable[[np.ndarray, int], bool],
@@ -203,7 +199,8 @@ def mc_es(
 
     return False, np.argmax(pi, 1), step
 
-@with_default_svalues
+
+@with_default_values
 def on_policy_mc(
     env: ParametrizedEnv,
     success_cb: Callable[[np.ndarray, int], bool],
@@ -253,7 +250,8 @@ def on_policy_mc(
 
     return False, np.argmax(pi, 1), step
 
-@with_default_svalues
+
+@with_default_values
 def off_policy_mc(
     env: ParametrizedEnv,
     success_cb: Callable[[np.ndarray, int], bool],
@@ -296,7 +294,8 @@ def off_policy_mc(
 
     return False, pi, step
 
-@with_default_svalues
+
+@with_default_values
 def off_policy_mc_non_inc(
     env: ParametrizedEnv,
     success_cb: Callable[[np.ndarray, int], bool],

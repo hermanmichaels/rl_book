@@ -5,12 +5,13 @@ import numpy as np
 
 from rl_book.env import ParametrizedEnv
 from rl_book.gym_utils import get_observation_action_space
-from rl_book.methods.method_wrapper import with_default_svalues
+from rl_book.methods.method_wrapper import with_default_values
 from rl_book.utils import get_eps_greedy_action, get_policy
 
 ALPHA = 0.1
 
-@with_default_svalues
+
+@with_default_values
 def sarsa(
     env: ParametrizedEnv, success_cb: Callable[[np.ndarray, int], bool], max_steps: int
 ) -> tuple[bool, np.ndarray, int]:
@@ -43,14 +44,14 @@ def sarsa(
 
     return False, get_policy(Q, observation_space), step
 
-@with_default_svalues
+
+@with_default_values
 def q(
     env, success_cb: Callable[[np.ndarray, int], bool], max_steps: int
 ) -> tuple[bool, np.ndarray, int]:
     observation_space, action_space = get_observation_action_space(env)
     Q = np.zeros((observation_space.n, action_space.n))
 
-    first_goal = True
     step = 0
 
     for step in range(max_steps):
@@ -65,24 +66,15 @@ def q(
                 action, observation
             )
 
-            # print(reward)
-
-            if first_goal and reward >= 1:
-                # print(step)
-                first_goal = False
-
             Q[observation, action] = Q[observation, action] + ALPHA * (
                 reward + env.gamma * np.max(Q[observation_new]) - Q[observation, action]
             )
             observation = observation_new
 
             c += 1
-            if c > 500:
+            if c > 500:  # TODO
                 print("XXXXXXXXXXXXXXXX")
                 break
-
-        # import ipdb
-        # ipdb.set_trace()
 
         pi = get_policy(Q, observation_space)
         if success_cb(pi, step):
@@ -90,7 +82,8 @@ def q(
 
     return False, get_policy(Q, observation_space), step
 
-@with_default_svalues
+
+@with_default_values
 def expected_sarsa(
     env: ParametrizedEnv, success_cb: Callable[[np.ndarray, int], bool], max_steps: int
 ) -> tuple[bool, np.ndarray, int]:
@@ -135,7 +128,8 @@ def expected_sarsa(
 
     return False, get_policy(Q, observation_space), step
 
-@with_default_svalues
+
+@with_default_values
 def double_q(
     env, success_cb: Callable[[np.ndarray, int], bool], max_steps: int
 ) -> tuple[bool, np.ndarray, int]:

@@ -4,14 +4,15 @@ from functools import partial
 import gymnasium as gym
 import matplotlib.pyplot as plt
 import numpy as np
-from gymnasium.envs.toy_text.frozen_lake import generate_random_map
 from gymnasium.core import Env
+from gymnasium.envs.toy_text.frozen_lake import generate_random_map
 
 from rl_book.env import ParametrizedEnv
 from rl_book.methods.mc import mc_es, off_policy_mc, on_policy_mc
-from rl_book.methods.planning import dyna_q, prioritized_sweeping
-from rl_book.methods.td import double_q, expected_sarsa, q, sarsa
-from rl_book.methods.td_n import sarsa_n, tree_n
+
+# from rl_book.methods.planning import dyna_q, prioritized_sweeping
+# from rl_book.methods.td import double_q, expected_sarsa, q, sarsa
+# from rl_book.methods.td_n import sarsa_n, tree_n
 
 GAMMA = 0.97
 
@@ -19,14 +20,15 @@ GAMMA = 0.97
 MAX_INFERENCE_STEPS = 1000
 
 MAX_STEPS = [10000, 30000, 100000]
-# MAX_STEPS = [100, 1000]
 TRIES_PER_STEP = 3
 
 
 def generate_random_env(n: int, extra_rewards, eps_decay) -> ParametrizedEnv:
     desc = generate_random_map(size=n)
     gym_env = gym.make(
-        "FrozenLake-v1", desc=desc, is_slippery=False, render_mode="human"
+        "FrozenLake-v1",
+        desc=desc,
+        is_slippery=False,  # render_mode="human"
     )
     return ParametrizedEnv(
         gym_env, GAMMA, intermediate_rewards=extra_rewards, eps_decay=eps_decay
@@ -131,10 +133,14 @@ def benchmark(
 
 if __name__ == "__main__":
     # benchmark([policy_iteration, value_iteration], fig_path="results/dp.png")
-    # benchmark(
-    #    [mc_es, on_policy_mc, off_policy_mc], 5, 16, False, False,
-    #    fig_path="results/mc.png",
-    # )
+    benchmark(
+        [mc_es, on_policy_mc, off_policy_mc],
+        5,
+        16,
+        False,
+        False,
+        fig_path="results/mc.png",
+    )
     # benchmark(
     #    [mc_es, on_policy_mc, off_policy_mc], 5, 16, True, True,
     #    fig_path="results/mc-true.png",
@@ -145,11 +151,11 @@ if __name__ == "__main__":
     # benchmark([sarsa, q, double_q], 5, 26, True, True, fig_path="results/td.png")
     # benchmark([sarsa_n, tree_n], 5, 16, False, False, fig_path="results/td_n_.png")
     # benchmark([sarsa_n, tree_n], 5, 16, True, True, fig_path="results/td_n_true.png")
-    benchmark(
-        [dyna_q, prioritized_sweeping],
-        50,
-        51,
-        False,
-        False,
-        fig_path="results/planning.png",
-    )
+    # benchmark(
+    #     [dyna_q, prioritized_sweeping],
+    #     50,
+    #     51,
+    #     False,
+    #     False,
+    #     fig_path="results/planning.png",
+    # )
