@@ -95,8 +95,7 @@ def generate_random_start(env: ParametrizedEnv) -> tuple[int, ParametrizedEnv]:
 def generate_episode(
     env: ParametrizedEnv,
     pi: np.ndarray,
-    exploring_starts: bool,
-    max_episode_length: int = 400,
+    exploring_starts: bool
 ) -> list[tuple[Any, Any, Any]]:
     """Generate an episode following the given policy.
 
@@ -104,11 +103,14 @@ def generate_episode(
         env: environment to use
         pi: policy to follow
         exploring_starts: true when to follow exploring state assumption (ES)
+        max_episode_length: TODO
 
     Returns:
         generated episode
     """
-    _, action_space = get_observation_action_space(env)
+    observation_space, action_space = get_observation_action_space(env)
+
+    max_episode_length = observation_space.n * 4
 
     episode = []
 
@@ -158,7 +160,6 @@ def mc_es(
     env: ParametrizedEnv,
     success_cb: Callable[[np.ndarray, int], bool],
     max_steps: int,
-    eps_decay: bool = False,
 ) -> tuple[bool, np.ndarray, int]:
     """Solve passed Gymnasium env via Monte Carlo
     with exploring starts.
@@ -205,7 +206,6 @@ def on_policy_mc(
     env: ParametrizedEnv,
     success_cb: Callable[[np.ndarray, int], bool],
     max_steps: int,
-    eps_decay: bool = False,
 ) -> tuple[bool, np.ndarray, int]:
     """Solve passed Gymnasium env via on-policy Monte
     Carlo control.
@@ -256,7 +256,6 @@ def off_policy_mc(
     env: ParametrizedEnv,
     success_cb: Callable[[np.ndarray, int], bool],
     max_steps: int,
-    eps_decay: bool = False,
 ) -> tuple[bool, np.ndarray, int]:
     """Solve passed Gymnasium env via off-policy Monte
     Carlo control.

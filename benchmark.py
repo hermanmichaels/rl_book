@@ -134,11 +134,11 @@ def benchmark(
 if __name__ == "__main__":
     # benchmark([policy_iteration, value_iteration], fig_path="results/dp.png")
     benchmark(
-        [mc_es, on_policy_mc, off_policy_mc],
+        [on_policy_mc, off_policy_mc],
         5,
-        16,
-        False,
-        False,
+        26,
+        True,
+        True,
         fig_path="results/mc.png",
     )
     # benchmark(
