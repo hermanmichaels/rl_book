@@ -1,6 +1,5 @@
 import copy
 import random
-import statistics
 from collections import defaultdict
 from typing import Any, Callable
 
@@ -93,9 +92,7 @@ def generate_random_start(env: ParametrizedEnv) -> tuple[int, ParametrizedEnv]:
 
 
 def generate_episode(
-    env: ParametrizedEnv,
-    pi: np.ndarray,
-    exploring_starts: bool
+    env: ParametrizedEnv, pi: np.ndarray, exploring_starts: bool
 ) -> list[tuple[Any, Any, Any]]:
     """Generate an episode following the given policy.
 

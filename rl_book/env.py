@@ -2,6 +2,7 @@ from dataclasses import dataclass
 
 import numpy as np
 from gymnasium.core import Env
+from gymnasium.spaces import Discrete
 
 
 @dataclass
@@ -39,7 +40,9 @@ class ParametrizedEnv:
         Used for reward heuristics under the assumption that a higher such
         value is better / closer to the goal.
         """
-        grid_size = np.sqrt(self.env.observation_space.n)
+        assert isinstance(self.env.observation_space, Discrete)
+        observation_space: Discrete = self.env.observation_space
+        grid_size = np.sqrt(observation_space.n)
         return (observation // grid_size + observation % grid_size) / grid_size
 
     def step(self, action: int, old_obs: int) -> tuple[int, float, bool, bool, dict]:
@@ -60,6 +63,7 @@ class ParametrizedEnv:
             - dictionary with additional info
         """
         observation, reward, terminated, truncated, info = self.env.step(action)
+        reward = float(reward)
         if self.intermediate_rewards:
             reward += self.normalized_grid_position_sum(
                 observation
