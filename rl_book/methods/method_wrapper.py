@@ -4,8 +4,36 @@ from typing import Callable
 import numpy as np
 
 from rl_book.env import ParametrizedEnv
+from gymnasium.core import Env
 
-INT_INF = 100000000
+MAX_INFERENCE_STEPS = 1000
+INT_INF = 100000
+
+def success_callback(pi: np.ndarray, step: int, env: Env) -> bool:
+    """Tests whether the given policy can successfully solve the given Gridworld environment.
+
+    Args:
+        pi: policy
+        step (int): current step
+        env: env
+
+    Returns:
+        False if current step is not a step to be checked, or policy does not solve env -
+        True otherwise.
+    """
+    print("####")
+    observation, _ = env.reset()
+    for _ in range(MAX_INFERENCE_STEPS):
+        action = pi[observation]
+        observation, reward, terminated, truncated, _ = env.step(action)
+        if terminated or truncated:
+            break
+    env.close()
+
+    print(observation)
+    print(reward)
+
+    return reward == 1
 
 # Decorator to add default values for success_cb and max_steps to all algorithm calls
 def with_default_values(func):
@@ -16,7 +44,7 @@ def with_default_values(func):
         max_steps: int | None = None,
     ):
         if success_cb is None:
-            success_cb = lambda pi, step: False
+            success_cb = functools.partial(success_callback, env=env.env)
         if max_steps is None:
             max_steps = INT_INF
         return func(env, success_cb, max_steps)

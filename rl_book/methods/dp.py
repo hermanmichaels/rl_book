@@ -7,6 +7,8 @@ from rl_book.env import ParametrizedEnv
 from rl_book.gym_utils import get_observation_action_space
 from rl_book.methods.method_wrapper import with_default_values
 
+EPS = 0.05
+
 
 def extract_policy(
     V: np.ndarray,
@@ -74,7 +76,7 @@ def policy_iteration(
                     ]
                 )
                 delta = max(delta, abs(v - V[s]))
-            if delta < env.eps:
+            if delta < EPS:
                 break
         return V
 
