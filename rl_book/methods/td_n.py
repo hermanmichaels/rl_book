@@ -8,7 +8,7 @@ from gymnasium.spaces import Discrete
 from rl_book.env import ParametrizedEnv
 from rl_book.gym_utils import get_observation_action_space
 from rl_book.methods.method_wrapper import with_default_values
-from rl_book.utils import div_with_zero, get_eps_greedy_action
+from rl_book.utils import div_with_zero, get_eps_greedy_action, get_policy
 
 
 @dataclass
@@ -20,10 +20,6 @@ class ReplayItem:
 
 ALPHA = 0.1
 
-
-# TODO:  re-use with TD
-def get_policy(Q, observation_space: Discrete) -> np.ndarray:
-    return np.array([np.argmax(Q[s]) for s in range(observation_space.n)])
 
 
 @with_default_values

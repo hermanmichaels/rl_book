@@ -58,7 +58,7 @@ def q(
         observation, _ = env.env.reset()
         terminated = truncated = False
 
-        c = 0
+        cur_episode_len = 0
 
         while not terminated and not truncated:
             action = get_eps_greedy_action(Q[observation], env.eps(step))
@@ -71,9 +71,8 @@ def q(
             )
             observation = observation_new
 
-            c += 1
-            if c > 500:  # TODO
-                print("XXXXXXXXXXXXXXXX")
+            cur_episode_len += 1
+            if cur_episode_len > 400:
                 break
 
         pi = get_policy(Q, observation_space)
@@ -102,7 +101,7 @@ def expected_sarsa(
         terminated = truncated = False
         action = get_eps_greedy_action(Q[observation])
 
-        c = 0
+        cur_episode_len = 0
 
         while not terminated and not truncated:
             observation_new, reward, terminated, truncated, _ = env.step(
@@ -122,8 +121,8 @@ def expected_sarsa(
         if success_cb(pi, step):
             return True, pi, step
 
-        c += 1
-        if c > 100:
+        cur_episode_len += 1
+        if cur_episode_len > 100:
             break
 
     return False, get_policy(Q, observation_space), step

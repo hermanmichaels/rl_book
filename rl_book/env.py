@@ -16,7 +16,7 @@ class ParametrizedEnv:
     eps_decay: bool = False
 
     def eps(self, step: int) -> float:
-        """Returns exploration factoring depending on current step.
+        """Returns exploration factor depending on current step.
 
         Args:
             step: current step

@@ -32,29 +32,29 @@ def solve_grid_world(method: str) -> None:
 
     # Find policy
     if method == "policy_iteration":
-        pi = policy_iteration(env_train)
+        pi = policy_iteration(env_train)[1]
     elif method == "value_iteration":
-        pi = value_iteration(env_train)
+        pi = value_iteration(env_train)[1]
     elif method == "mc_es":
-        pi = mc_es(env_train)
+        pi = mc_es(env_train)[1]
     elif method == "on_policy_mc":
         pi = on_policy_mc(env_train)[1]
     elif method == "off_policy_mc":
-        pi = off_policy_mc(env_train)
+        pi = off_policy_mc(env_train)[1]
     elif method == "off_policy_mc_non_inc":
-        pi = off_policy_mc_non_inc(env_train)
+        pi = off_policy_mc_non_inc(env_train)[1]
     elif method == "sarsa":
-        pi = sarsa(env_train)
+        pi = sarsa(env_train)[1]
     elif method == "q":
-        pi = q(env_train)
+        pi = q(env_train)[1]
     elif method == "expected_sarsa":
-        pi = expected_sarsa(env_train)
+        pi = expected_sarsa(env_train)[1]
     elif method == "double_q":
-        pi = double_q(env_train)
+        pi = double_q(env_train)[1]
     elif method == "sarsa_n":
-        pi = sarsa_n(env_train)
+        pi = sarsa_n(env_train)[1]
     elif method == "tree_n":
-        pi = tree_n(env_train)
+        pi = tree_n(env_train)[1]
     else:
         raise ValueError(f"Unknown solution method {method}")
     gym_env_train.close()

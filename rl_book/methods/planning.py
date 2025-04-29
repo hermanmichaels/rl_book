@@ -32,7 +32,7 @@ def dyna_q(
     env: ParametrizedEnv,
     success_cb: Callable[[np.ndarray, int], bool],
     max_steps: int,
-    n=3,
+    n: int =3,
     plus_mode: bool = False,
 ) -> tuple[bool, np.ndarray, int]:
     observation_space, action_space = get_observation_action_space(env)
