@@ -1,27 +1,36 @@
 import random
+from typing import Callable
 
 import numpy as np
 
 from rl_book.env import ParametrizedEnv
 from rl_book.gym_utils import get_observation_action_space
-from rl_book.utils import get_eps_greedy_action
+from rl_book.methods.method_wrapper import with_default_values
+from rl_book.utils import get_eps_greedy_action, get_policy
 
 ALPHA = 0.1
-NUM_STEPS = 1000
 
 
-def sarsa(env: ParametrizedEnv) -> np.ndarray:
+@with_default_values
+def sarsa(
+    env: ParametrizedEnv, success_cb: Callable[[np.ndarray, int], bool], max_steps: int
+) -> tuple[bool, np.ndarray, int]:
     observation_space, action_space = get_observation_action_space(env)
     Q = np.zeros((observation_space.n, action_space.n))
 
-    for _ in range(NUM_STEPS):
+    for step in range(max_steps):
         observation, _ = env.env.reset()
         terminated = truncated = False
-        action = get_eps_greedy_action(Q[observation])
+
+        eps = env.eps(step)
+
+        action = get_eps_greedy_action(Q[observation], eps)
 
         while not terminated and not truncated:
-            observation_new, reward, terminated, truncated, _ = env.env.step(action)
-            action_new = get_eps_greedy_action(Q[observation_new])
+            observation_new, reward, terminated, truncated, _ = env.step(
+                action, observation
+            )
+            action_new = get_eps_greedy_action(Q[observation_new], eps)
             q_next = Q[observation_new, action_new] if not terminated else 0
             Q[observation, action] = Q[observation, action] + ALPHA * (
                 float(reward) + env.gamma * q_next - Q[observation, action]
@@ -29,29 +38,52 @@ def sarsa(env: ParametrizedEnv) -> np.ndarray:
             observation = observation_new
             action = action_new
 
-    return np.array([np.argmax(Q[s]) for s in range(observation_space.n)])
+        pi = get_policy(Q, observation_space)
+        if success_cb(pi, step):
+            return True, pi, step
+
+    return False, get_policy(Q, observation_space), step
 
 
-def q(env) -> np.ndarray:
+@with_default_values
+def q(
+    env, success_cb: Callable[[np.ndarray, int], bool], max_steps: int
+) -> tuple[bool, np.ndarray, int]:
     observation_space, action_space = get_observation_action_space(env)
     Q = np.zeros((observation_space.n, action_space.n))
 
-    for _ in range(NUM_STEPS):
+    for step in range(max_steps):
         observation, _ = env.env.reset()
         terminated = truncated = False
 
+        cur_episode_len = 0
+
         while not terminated and not truncated:
-            action = get_eps_greedy_action(Q[observation])
-            observation_new, reward, terminated, truncated, _ = env.env.step(action)
+            action = get_eps_greedy_action(Q[observation], env.eps(step))
+            observation_new, reward, terminated, truncated, _ = env.step(
+                action, observation
+            )
+
             Q[observation, action] = Q[observation, action] + ALPHA * (
                 reward + env.gamma * np.max(Q[observation_new]) - Q[observation, action]
             )
             observation = observation_new
 
-    return np.array([np.argmax(Q[s]) for s in range(env.env.observation_space.n)])
+            cur_episode_len += 1
+            if cur_episode_len > 400:
+                break
+
+        pi = get_policy(Q, observation_space)
+        if success_cb(pi, step):
+            return True, pi, step
+
+    return False, get_policy(Q, observation_space), step
 
 
-def expected_sarsa(env: ParametrizedEnv) -> np.ndarray:
+@with_default_values
+def expected_sarsa(
+    env: ParametrizedEnv, success_cb: Callable[[np.ndarray, int], bool], max_steps: int
+) -> tuple[bool, np.ndarray, int]:
     observation_space, action_space = get_observation_action_space(env)
     Q = np.zeros((observation_space.n, action_space.n))
 
@@ -62,13 +94,17 @@ def expected_sarsa(env: ParametrizedEnv) -> np.ndarray:
             else 1
         )
 
-    for _ in range(NUM_STEPS):
+    for step in range(max_steps):
         observation, _ = env.env.reset()
         terminated = truncated = False
         action = get_eps_greedy_action(Q[observation])
 
+        cur_episode_len = 0
+
         while not terminated and not truncated:
-            observation_new, reward, terminated, truncated, _ = env.env.step(action)
+            observation_new, reward, terminated, truncated, _ = env.step(
+                action, observation
+            )
             action_new = get_eps_greedy_action(Q[observation_new])
             updated_q_value = Q[observation, action] + ALPHA * (
                 reward - Q[observation, action]
@@ -79,21 +115,36 @@ def expected_sarsa(env: ParametrizedEnv) -> np.ndarray:
             observation = observation_new
             action = action_new
 
-    return np.array([np.argmax(Q[s]) for s in range(observation_space.n)])
+        pi = get_policy(Q, observation_space)
+        if success_cb(pi, step):
+            return True, pi, step
+
+        cur_episode_len += 1
+        if cur_episode_len > 100:
+            break
+
+    return False, get_policy(Q, observation_space), step
 
 
-def double_q(env) -> np.ndarray:
+@with_default_values
+def double_q(
+    env, success_cb: Callable[[np.ndarray, int], bool], max_steps: int
+) -> tuple[bool, np.ndarray, int]:
     observation_space, action_space = get_observation_action_space(env)
     Q_1 = np.zeros((observation_space.n, action_space.n))
     Q_2 = np.zeros((observation_space.n, action_space.n))
 
-    for _ in range(NUM_STEPS):
+    for step in range(max_steps):
         observation, _ = env.env.reset()
+
         terminated = truncated = False
 
         while not terminated and not truncated:
-            action = get_eps_greedy_action(Q_1[observation] + Q_2[observation])
-            observation_new, reward, terminated, truncated, _ = env.env.step(action)
+            action = get_eps_greedy_action(Q_1[observation], env.eps(step))
+            observation_new, reward, terminated, truncated, _ = env.step(
+                action, observation
+            )
+
             if random.randint(0, 100) < 50:
                 Q_1[observation, action] = Q_1[observation, action] + ALPHA * (
                     reward
@@ -108,4 +159,8 @@ def double_q(env) -> np.ndarray:
                 )
             observation = observation_new
 
-    return np.array([np.argmax(Q_1[s]) for s in range(env.env.observation_space.n)])
+        pi = get_policy(Q_1, observation_space)
+        if success_cb(pi, step):
+            return True, pi, step
+
+    return False, get_policy(Q_1, observation_space), step

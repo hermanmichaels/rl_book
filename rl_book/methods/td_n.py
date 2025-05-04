@@ -1,11 +1,13 @@
 import math
 from dataclasses import dataclass
+from typing import Callable
 
 import numpy as np
 
 from rl_book.env import ParametrizedEnv
 from rl_book.gym_utils import get_observation_action_space
-from rl_book.utils import div_with_zero, get_eps_greedy_action
+from rl_book.methods.method_wrapper import with_default_values
+from rl_book.utils import div_with_zero, get_eps_greedy_action, get_policy
 
 
 @dataclass
@@ -16,14 +18,20 @@ class ReplayItem:
 
 
 ALPHA = 0.1
-NUM_STEPS = 1000
 
 
-def sarsa_n(env: ParametrizedEnv, n: int = 3, off_policy: bool = False) -> np.ndarray:
+@with_default_values
+def sarsa_n(
+    env: ParametrizedEnv,
+    success_cb: Callable[[np.ndarray, int], bool],
+    max_steps: int,
+    n: int = 3,
+    off_policy: bool = False,
+) -> tuple[bool, np.ndarray, int]:
     observation_space, action_space = get_observation_action_space(env)
     Q = np.zeros((observation_space.n, action_space.n))
 
-    for _ in range(NUM_STEPS):
+    for step in range(max_steps):
         b = (
             np.random.rand(int(observation_space.n), int(action_space.n))
             if off_policy
@@ -34,7 +42,7 @@ def sarsa_n(env: ParametrizedEnv, n: int = 3, off_policy: bool = False) -> np.nd
 
         terminated = truncated = False
         action = (
-            get_eps_greedy_action(Q[observation])
+            get_eps_greedy_action(Q[observation], env.eps(step))
             if not off_policy
             else get_eps_greedy_action(b[observation], eps=0)
         )
@@ -50,8 +58,10 @@ def sarsa_n(env: ParametrizedEnv, n: int = 3, off_policy: bool = False) -> np.nd
         while True:
             if t < T:
                 # While not terminal, continue playing episode.
-                observation_new, reward, terminated, truncated, _ = env.env.step(action)
-                action_new = get_eps_greedy_action(Q[observation_new])
+                observation_new, reward, terminated, truncated, _ = env.step(
+                    action, observation
+                )
+                action_new = get_eps_greedy_action(Q[observation_new], env.eps(step))
                 replay_buffer.append(
                     ReplayItem(observation_new, action_new, float(reward))
                 )
@@ -99,17 +109,27 @@ def sarsa_n(env: ParametrizedEnv, n: int = 3, off_policy: bool = False) -> np.nd
 
             t += 1
 
-    return np.array([np.argmax(Q[s]) for s in range(observation_space.n)])
+        pi = get_policy(Q, observation_space)
+        if success_cb(pi, step):
+            return True, pi, step
+
+    return False, get_policy(Q, observation_space), step
 
 
-def tree_n(env: ParametrizedEnv, n: int = 3) -> np.ndarray:
+@with_default_values
+def tree_n(
+    env: ParametrizedEnv,
+    success_cb: Callable[[np.ndarray, int], bool],
+    max_steps: int,
+    n: int = 3,
+) -> tuple[bool, np.ndarray, int]:
     observation_space, action_space = get_observation_action_space(env)
     Q = np.zeros((observation_space.n, action_space.n)) + 0.1
 
-    for _ in range(NUM_STEPS):
+    for step in range(max_steps):
         observation, _ = env.env.reset()
         terminated = truncated = False
-        action = get_eps_greedy_action(Q[observation])
+        action = get_eps_greedy_action(Q[observation], env.eps(step))
 
         replay_buffer = [ReplayItem(observation, action, 0.0)]
 
@@ -119,8 +139,10 @@ def tree_n(env: ParametrizedEnv, n: int = 3) -> np.ndarray:
 
         while True:
             if t < T:
-                observation_new, reward, terminated, truncated, _ = env.env.step(action)
-                action_new = get_eps_greedy_action(Q[observation_new])
+                observation_new, reward, terminated, truncated, _ = env.step(
+                    action, observation
+                )
+                action_new = get_eps_greedy_action(Q[observation_new], env.eps(step))
                 replay_buffer.append(
                     ReplayItem(observation_new, action_new, float(reward))
                 )
@@ -173,4 +195,8 @@ def tree_n(env: ParametrizedEnv, n: int = 3) -> np.ndarray:
 
             t += 1
 
-    return np.array([np.argmax(Q[s]) for s in range(observation_space.n)])
+        pi = get_policy(Q, observation_space)
+        if success_cb(pi, step):
+            return True, pi, step
+
+    return False, get_policy(Q, observation_space), step
