@@ -100,7 +100,6 @@ def generate_episode(
         env: environment to use
         pi: policy to follow
         exploring_starts: true when to follow exploring state assumption (ES)
-        max_episode_length: TODO
 
     Returns:
         generated episode
