@@ -52,8 +52,6 @@ def q(
     observation_space, action_space = get_observation_action_space(env)
     Q = np.zeros((observation_space.n, action_space.n))
 
-    step = 0
-
     for step in range(max_steps):
         observation, _ = env.env.reset()
         terminated = truncated = False

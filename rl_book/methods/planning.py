@@ -7,6 +7,7 @@ import numpy as np
 
 from rl_book.env import ParametrizedEnv
 from rl_book.gym_utils import get_observation_action_space
+from rl_book.methods.method_wrapper import with_default_values
 from rl_book.methods.td import ALPHA, get_eps_greedy_action
 from rl_book.utils import get_policy
 
@@ -27,7 +28,7 @@ class ReplayBuffer:
     def sample(self) -> tuple[int, int]:
         return self.replay_buffer[random.randint(0, len(self.replay_buffer) - 1)]
 
-
+@with_default_values
 def dyna_q(
     env: ParametrizedEnv,
     success_cb: Callable[[np.ndarray, int], bool],
@@ -103,7 +104,7 @@ def generate_predecessor_states(
 
     return predecessors
 
-
+@with_default_values
 def prioritized_sweeping(
     env: ParametrizedEnv, success_cb: Callable[[np.ndarray, int], bool], max_steps: int
 ) -> tuple[bool, np.ndarray, int]:

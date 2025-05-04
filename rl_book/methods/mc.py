@@ -296,7 +296,6 @@ def off_policy_mc_non_inc(
     env: ParametrizedEnv,
     success_cb: Callable[[np.ndarray, int], bool],
     max_steps: int,
-    eps_decay: bool = False,
 ) -> tuple[bool, np.ndarray, int]:
     """Solve passed Gymnasium env via on-policy Monte
     Carlo control - but does not use incremental algorithm

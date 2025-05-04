@@ -10,11 +10,13 @@ from rl_book.methods.planning import dyna_q, mcts, prioritized_sweeping
 from rl_book.methods.td import double_q, q, sarsa
 from rl_book.methods.td_n import sarsa_n, tree_n
 
+MAX_STEPS = 100
+
 
 @pytest.mark.parametrize("method", [policy_iteration, value_iteration])
 def test_dp(env_train: ParametrizedEnv, method: Callable):
     observation_space, _ = get_observation_action_space(env_train)
-    pi = method(env_train)
+    pi = method(env_train, max_steps=MAX_STEPS)[1]
     assert pi.shape == (observation_space.n,)
 
 
@@ -23,21 +25,21 @@ def test_dp(env_train: ParametrizedEnv, method: Callable):
 )
 def test_mc(env_train: ParametrizedEnv, method: Callable):
     observation_space, _ = get_observation_action_space(env_train)
-    pi = method(env_train)
+    pi = method(env_train, max_steps=MAX_STEPS)[1]
     assert pi.shape == (observation_space.n,)
 
 
 @pytest.mark.parametrize("method", [sarsa, q, double_q])
 def test_td(env_train: ParametrizedEnv, method: Callable):
     observation_space, _ = get_observation_action_space(env_train)
-    pi = method(env_train)
+    pi = method(env_train, max_steps=MAX_STEPS)[1]
     assert pi.shape == (observation_space.n,)
 
 
 @pytest.mark.parametrize("method", [sarsa_n, tree_n])
 def test_td_n(env_train: ParametrizedEnv, method: Callable):
     observation_space, _ = get_observation_action_space(env_train)
-    pi = method(env_train)
+    pi = method(env_train, max_steps=MAX_STEPS)[1]
     assert pi.shape == (observation_space.n,)
 
 
@@ -50,7 +52,7 @@ def test_td_n(env_train: ParametrizedEnv, method: Callable):
 )
 def test_planning(env_train: ParametrizedEnv, method: Callable):
     observation_space, _ = get_observation_action_space(env_train)
-    pi = method(env_train)
+    pi = method(env_train, max_steps=MAX_STEPS)[1]
     assert pi.shape == (observation_space.n,)
 
 
