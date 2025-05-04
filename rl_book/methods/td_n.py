@@ -3,7 +3,6 @@ from dataclasses import dataclass
 from typing import Callable
 
 import numpy as np
-from gymnasium.spaces import Discrete
 
 from rl_book.env import ParametrizedEnv
 from rl_book.gym_utils import get_observation_action_space
@@ -19,7 +18,6 @@ class ReplayItem:
 
 
 ALPHA = 0.1
-
 
 
 @with_default_values
