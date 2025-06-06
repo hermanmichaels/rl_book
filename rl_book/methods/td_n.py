@@ -195,6 +195,77 @@ def sarsa_n(
 
     return False, get_policy(Q, observation_space), step
 
+class TreeN(TDMethod):
+    def __init__(self, n: int = 3):
+        self.Q = defaultdict(float)
+        self.n = n
+
+    def finalize(self, replay_buffer):
+        for tau in range(len(replay_buffer) - self.n - 1, len(replay_buffer)):
+            self.update(replay_buffer, tau)
+
+    def update(self, replay_buffer, tau = None):
+        is_final = True
+        if tau is None:
+            tau = len(replay_buffer) - self.n - 1
+            is_final = False
+
+        print(f"{tau} -- {len(replay_buffer)}")
+        b = self.Q
+        rhos = []
+        # T = len(replay_buffer) - 1
+
+        if tau >= 0:
+            if is_final:
+                G = replay_buffer[-1].reward
+            else:
+                G = replay_buffer[-1].reward + 0.95 * sum(
+                    [
+                        self.Q[replay_buffer[-1].state, a]
+                        / (sum([self.Q[replay_buffer[-1].state, a] for a in range(4)])  + 0.001)
+                        * self.Q[replay_buffer[-1].state, a]
+                        for a in range(4)
+                    ]
+                )
+
+                for k in range(tau, min(tau + self.n, len(replay_buffer))):
+                    G = (
+                        replay_buffer[k].reward
+                        + 0.95
+                        * sum(
+                            [
+                                self.Q[replay_buffer[k].state, a]
+                                / (sum([self.Q[replay_buffer[k].state, a] for a in range(4)]) + 0.001)
+                                * self.Q[replay_buffer[k].state, a]
+                                for a in range(4)
+                                if a != replay_buffer[k].action
+                            ]
+                        )
+                        + 0.95
+                        * self.Q[replay_buffer[k].state, replay_buffer[k].action]
+                        / (sum([self.Q[replay_buffer[k].state, a] for a in range(4)]) + 0.001)
+                        * G
+                    )
+
+                self.Q[replay_buffer[tau].state, replay_buffer[tau].action] = self.Q[
+                    replay_buffer[tau].state, replay_buffer[tau].action
+                ] + ALPHA * (G - self.Q[replay_buffer[tau].state, replay_buffer[tau].action])
+            
+
+    # TODO: share
+    def act(self, state, mask):
+        q_values = [self.Q[(state, a)] for a in np.nonzero(mask)[0].tolist()]
+        max_q = max(q_values)
+
+        eps_greedy = random.randint(0, 100)
+
+        # TODO: eps greedy?
+        max_actions = [a for a, q in zip(np.nonzero(mask)[0].tolist(), q_values) if q == max_q or eps_greedy <= 5]
+
+        # import ipdb
+        # ipdb.set_trace()
+        
+        return random.choice(max_actions)
 
 @with_default_values
 def tree_n(

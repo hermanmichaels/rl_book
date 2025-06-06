@@ -31,6 +31,8 @@ class Sarsa(TDMethod):
         prev_state = episode[len(episode) - 2]
         cur_state = episode[len(episode) - 1]
 
+        # TODO :action?
+
         if np.sum(cur_state.mask) > 0:
             action_new = self.act(cur_state.state, cur_state.mask)
             q_next = self.Q[cur_state.state, action_new]
@@ -319,7 +321,64 @@ def q(
 
     return False, get_policy(Q, observation_space), step
 
+class ExpectedSarsa(TDMethod):
+    def __init__(self):
+        self.Q = defaultdict(float)
 
+    def update(self, episode):
+        if len(episode) <= 1:
+            return
+        
+        prev_state = episode[len(episode) - 2]
+        cur_state = episode[len(episode) - 1]
+
+        if np.sum(cur_state.mask) > 0:
+            action_new = self.act(cur_state.state, cur_state.mask)
+            q_next = self.Q[cur_state.state, action_new]
+        else:
+            q_next = 0
+        # import ipdb
+        # ipdb.set_trace()
+            
+
+        # if prev_state.reward > 0:
+        #     import ipdb
+        #     ipdb.set_trace()
+
+        updated_q_value = self.Q[prev_state.state, prev_state.action] + ALPHA * (
+                prev_state.reward - self.Q[prev_state.state, prev_state.action]
+            )
+        
+        def _get_action_prob(observation_new, a) -> float:
+            return (
+                self.Q[observation_new, a] / sum([self.Q[observation_new, aa] for aa in range(4)])
+                if sum([self.Q[observation_new, aa] for aa in range(4)])
+                else 1
+            )
+    
+        for a in range(4):
+                updated_q_value += ALPHA * _get_action_prob(cur_state.state, a) * self.Q[cur_state.state, a]
+        self.Q[prev_state.state, prev_state.action] = updated_q_value
+
+    def finalize(self, episode):
+        self.update(episode)
+
+    # TODO: share
+    def act(self, state, mask):
+        q_values = [self.Q[state, a] for a in np.nonzero(mask)[0].tolist()]
+        # import ipdb
+        # ipdb.set_trace()
+        max_q = max(q_values)
+
+        # import ipdb
+        # ipdb.set_trace()
+        eps_greedy = random.randint(0, 100)
+
+        # TODO: eps greedy?
+        max_actions = [a for a, q in zip(np.nonzero(mask)[0].tolist(), q_values) if q == max_q or eps_greedy <= 5]
+
+        return random.choice(max_actions)
+    
 @with_default_values
 def expected_sarsa(
     env: ParametrizedEnv, success_cb: Callable[[np.ndarray, int], bool], max_steps: int
@@ -365,6 +424,49 @@ def expected_sarsa(
 
     return False, get_policy(Q, observation_space), step
 
+
+class DoubleQ(TDMethod):
+    def __init__(self):
+        self.Q_1 = defaultdict(float)
+        self.Q_2 = defaultdict(float)
+
+    def update(self, episode):
+        if len(episode) <= 1:
+            return
+        
+        # prev_state = episode[len(episode) - 2]
+        cur_state = episode[len(episode) - 2]
+        next_state = episode[len(episode) - 1]
+        
+
+        if random.randint(0, 100) < 50:
+            max_q = max([self.Q_1[next_state.state, a_] for a_ in range(len(cur_state.mask))], default=0) # TODO: maks # tood: right mask index?
+            max_q_a = [a_ for a_ in range(len(cur_state.mask)) if self.Q_1[next_state.state, a_] == max_q][0]
+            self.Q_1[cur_state.state, cur_state.action] = self.Q_1[cur_state.state, cur_state.action] + ALPHA * (
+                            cur_state.reward + 0.95 * self.Q_2[next_state.state, max_q_a] - self.Q_1[cur_state.state, cur_state.action]
+                            )
+        else:
+            max_q = max([self.Q_2[next_state.state, a_] for a_ in range(len(cur_state.mask))], default=0) # TODO: maks # tood: right mask index?
+            max_q_a = [a_ for a_ in range(len(cur_state.mask)) if self.Q_2[next_state.state, a_] == max_q][0]
+            self.Q_2[cur_state.state, cur_state.action] = self.Q_2[cur_state.state, cur_state.action] + ALPHA * (
+                            cur_state.reward + 0.95 * self.Q_1[next_state.state, max_q_a] - self.Q_2[cur_state.state, cur_state.action]
+                            )
+
+    def finalize(self, episode):
+        print("####")
+        self.update(episode)
+
+    def act(self, state, mask):
+        q_values = [self.Q_1[(state, a)] for a in np.nonzero(mask)[0].tolist()]
+        max_q = max(q_values)
+
+        eps_greedy = random.randint(0, 100)
+
+        # TODO: eps greedy?
+        max_actions = [a for a, q in zip(np.nonzero(mask)[0].tolist(), q_values) if q == max_q or eps_greedy <= 5]
+
+        return random.choice(max_actions)
+    
 
 @with_default_values
 def double_q(

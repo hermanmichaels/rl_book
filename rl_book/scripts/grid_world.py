@@ -5,9 +5,9 @@ import gymnasium as gym
 from rl_book.env import ParametrizedEnv
 from rl_book.gym_utils import get_observation_action_space
 from rl_book.methods.dp import policy_iteration, value_iteration
-from rl_book.methods.mc import McEs, OffPolicyMC, OffPolicyMCNonInc, OnPolicyMC, mc_es, off_policy_mc, off_policy_mc_non_inc, on_policy_mc
-from rl_book.methods.td import QLearning, Sarsa, double_q, expected_sarsa, q, sarsa
-from rl_book.methods.td_n import sarsa_n, tree_n
+from rl_book.methods.mc import OffPolicyMC, OffPolicyMCNonInc, OnPolicyMC, off_policy_mc, off_policy_mc_non_inc, on_policy_mc
+from rl_book.methods.td import DoubleQ, ExpectedSarsa, QLearning, Sarsa, double_q, expected_sarsa, q, sarsa
+from rl_book.methods.td_n import SarsaN, TreeN, sarsa_n, tree_n
 from rl_book.replay_utils import ReplayItem
 from rl_book.utils import get_policy
 
@@ -20,6 +20,7 @@ def train(env, method):
     observation_space, action_space = get_observation_action_space(env)
 
     for step in range(10000):
+        # print(step)
         observation, _ = env.env.reset()
         terminated = truncated = False
 
@@ -27,7 +28,7 @@ def train(env, method):
         episode = []
 
         while not terminated and not truncated:
-            action = method.act(observation, [1 for _ in range(action_space.n)])
+            action = method.act(observation, [1 for _ in range(action_space.n)], step)
 
             # import ipdb
             # ipdb.set_trace()
@@ -40,15 +41,18 @@ def train(env, method):
 
             observation = observation_new
 
-        episode.append(ReplayItem(observation_new, -1, reward, []))
-        method.finalize(episode)
+            cur_episode_len += 1
+            # print(cur_episode_len)
 
-    pi = get_policy(method.Q, observation_space, action_space)
+        episode.append(ReplayItem(observation_new, -1, reward, []))
+        method.finalize(episode, step)
+
+    pi = get_policy(method.Q, observation_space, action_space) # todo: make function of class
 
     return False, pi, step
 
 
-def solve_grid_world(method: str) -> None:
+def solve_grid_world(method_name: str) -> None:
     """Solve the grid world problem using the chosen solving method.
 
     Args:
@@ -65,35 +69,33 @@ def solve_grid_world(method: str) -> None:
     )
 
     # Find policy
-    if method == "policy_iteration":
+    if method_name == "policy_iteration":
         pi = policy_iteration(env_train)[1]
-    elif method == "value_iteration":
+    elif method_name == "value_iteration":
         pi = value_iteration(env_train)[1]
     else:
-        if method == "mc_es":
-            algorithm = McEs()
-        elif method == "on_policy_mc":
-            algorithm = OnPolicyMC()
-        elif method == "off_policy_mc":
-            algorithm = OffPolicyMC()
-        elif method == "off_policy_mc_non_inc":
-            algorithm = OffPolicyMCNonInc()
-        elif method == "sarsa":
-            algorithm = Sarsa()
-        elif method == "q":
-            algorithm = QLearning()
-        elif method == "expected_sarsa":
-            pi = expected_sarsa(env_train)[1]
-        elif method == "double_q":
-            pi = double_q(env_train)[1]
-        elif method == "sarsa_n":
-            pi = sarsa_n(env_train)[1]
-        elif method == "tree_n":
-            pi = tree_n(env_train)[1]
+        if method_name == "on_policy_mc":
+            method = OnPolicyMC(env_train)
+        elif method_name == "off_policy_mc":
+            method = OffPolicyMC(env_train)
+        elif method_name == "off_policy_mc_non_inc":
+            method = OffPolicyMCNonInc(env_train)
+        elif method_name == "sarsa":
+            method = Sarsa(env_train)
+        elif method_name == "q":
+            method = QLearning(env_train)
+        elif method_name == "expected_sarsa":
+            method = ExpectedSarsa(env_train)
+        elif method_name == "double_q":
+            method = DoubleQ(env_train)
+        elif method_name == "sarsa_n":
+            method = SarsaN(env_train)
+        elif method_name == "tree_n":
+            method = TreeN(env_train)
         else:
-            raise ValueError(f"Unknown solution method {method}")
+            raise ValueError(f"Unknown solution method {method_name}")
         
-        pi = train(env_train, algorithm)[1]
+        pi = train(env_train, method)[1]
 
     gym_env_train.close()
 
