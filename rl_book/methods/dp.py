@@ -93,7 +93,7 @@ def policy_iteration(
             )
 
         pi = extract_policy(
-            V, observation_space, action_space, env.env.P, env.gamma  # type: ignore
+            V, observation_space, action_space, env.env.unwrapped.P, env.gamma  # type: ignore
         )
         success = success_cb(pi, step)
 
@@ -128,13 +128,13 @@ def value_iteration(
                 [
                     p * (r + env.gamma * V[s_next])
                     for a in range(action_space.n)
-                    for p, s_next, r, _ in env.env.P[s][a]  # type: ignore
+                    for p, s_next, r, _ in env.env.unwrapped.P[s][a]  # type: ignore
                 ]
             )
             delta = max(delta, abs(v - V[s]))
 
         pi = extract_policy(
-            V, observation_space, action_space, env.env.P, env.gamma  # type: ignore
+            V, observation_space, action_space, env.env.unwrapped.P, env.gamma  # type: ignore
         )
         success = success_cb(pi, step)
         if success:

@@ -18,5 +18,10 @@ def div_with_zero(x: float, y: float) -> float:
         return x / (y + 0.0001)
 
 
-def get_policy(Q, observation_space: Discrete) -> np.ndarray:
-    return np.array([np.argmax(Q[s]) for s in range(observation_space.n)])
+def get_policy(Q, observation_space: Discrete, action_space) -> np.ndarray:
+    # import ipdb
+    # ipdb.set_trace()
+    # pp = np.array([np.argmax([Q[s, a] for a in range(action_space.n)]) for s in range(observation_space.n)])
+    # import ipdb
+    # ipdb.set_trace()
+    return np.array([np.argmax([Q[s, a] for a in range(action_space.n)]) for s in range(observation_space.n)])

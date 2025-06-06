@@ -10,7 +10,7 @@ class ParametrizedEnv:
     env: Env
     gamma: float
     _eps_end: float = 0.05
-    _eps_start: float = 1
+    _eps_start: float = 0.9 # TOOD: 1 crashes with MC
     _num_decay_steps: int = 1000
     intermediate_rewards: bool = False
     eps_decay: bool = False
