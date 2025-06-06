@@ -120,6 +120,9 @@ def value_iteration(
 
     V = np.zeros(observation_space.n)
 
+    import ipdb
+    ipdb.set_trace()
+
     for step in range(max_steps):
         delta = 0
         for s in range(observation_space.n):

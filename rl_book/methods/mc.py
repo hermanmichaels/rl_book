@@ -7,7 +7,9 @@ import numpy as np
 
 from rl_book.env import ParametrizedEnv
 from rl_book.gym_utils import get_observation_action_space
+from rl_book.methods.method import Algorithm
 from rl_book.methods.method_wrapper import with_default_values
+from rl_book.methods.td import TDMethod
 
 _cached_functions = []
 
@@ -144,11 +146,49 @@ def generate_episode(
     return episode
 
 
-def get_eps_greedy_policy(env, Q, step):
-    b = np.ones_like(Q) * (env.eps(step) / Q.shape[1])
-    optimal_actions = np.argmax(Q, axis=1)
-    b[np.arange(Q.shape[0]), optimal_actions] += 1 - env.eps(step)
+def get_eps_greedy_policy(Q, step):
+    # env
+    QQ = np.zeros((16, 4))
+    for i in range(16):
+        for j in range(4):
+            QQ[i, j] = Q[i, j]
+    b = np.zeros_like(QQ) + 0.05 / 4
+    optimal_actions = np.argmax(QQ, 1)
+    b[np.arange(QQ.shape[0]), optimal_actions] = b[np.arange(QQ.shape[0]), optimal_actions] + 1 - 0.05
+    # import ipdb
+    # ipdb.set_trace()
     return b
+
+class McEs(TDMethod):
+    def __init__(self):
+        self.Q = defaultdict(float)
+        self.counts = defaultdict(int)
+
+    def act(self, state, mask):
+        q_values = [self.Q[(state, a)] for a in np.nonzero(mask)[0].tolist()]
+        max_q = max(q_values)
+        max_actions = [a for a, q in zip(np.nonzero(mask)[0].tolist(), q_values) if q == max_q]
+
+        return random.choice(max_actions)
+
+    def update(self, episode):
+        pass
+
+    def finalize(self, episode):
+        G = 0.0
+        for t in range(len(episode) - 1, -1, -1):
+            s = episode[t].state
+            a = episode[t].action
+            r = episode[t].reward
+
+            G = 0.95 * G + r
+            prev_s = [(item.state, item.action) for item in episode[:t]]
+            if (s, a) not in prev_s:
+                self.counts[s, a] += 1
+                self.Q[s, a] += (G - self.Q[s, a]) / self.counts[s, a]
+                # if not all(Q[s, a] == Q[s, 0] for a in range(action_space.n)):
+                #     for a in range(action_space.n):
+                #         pi[s, a] = 1 if a == np.argmax(Q[s]) else 0    
 
 
 @with_default_values
@@ -195,6 +235,34 @@ def mc_es(
             return True, p, step
 
     return False, np.argmax(pi, 1), step
+
+class OnPolicyMC(TDMethod):
+    def __init__(self):
+        self.Q = defaultdict(float)
+        self.counts = defaultdict(int)
+
+    def act(self, state, mask):
+        actions = np.nonzero(mask)[0].tolist()
+        q_values = [self.Q[(state, a)] for a in actions]
+        max_q = max(q_values)
+        weights = np.asarray([1 - 0.05 if q == max_q else 0.05 for q in q_values])
+        return np.random.choice(actions, p=weights/sum(weights))
+
+    def update(self, episode):
+        pass
+
+    def finalize(self, episode):
+        G = 0.0
+        for t in range(len(episode) - 1, -1, -1):
+            s = episode[t].state
+            a = episode[t].action
+            r = episode[t].reward
+
+            G = 0.95 * G + r
+            prev_s = [(item.state, item.action) for item in episode[:t]]
+            if (s, a) not in prev_s:
+                self.counts[s, a] += 1
+                self.Q[s, a] += (G - self.Q[s, a]) / self.counts[s, a]
 
 
 @with_default_values
@@ -246,6 +314,37 @@ def on_policy_mc(
 
     return False, np.argmax(pi, 1), step
 
+class OffPolicyMC(TDMethod):
+    def __init__(self):
+        self.Q = defaultdict(float)
+        self.C = defaultdict(int)
+
+    def act(self, state, mask):
+        actions = np.nonzero(mask)[0].tolist()
+        q_values = [self.Q[(state, a)] for a in actions]
+        max_q = max(q_values)
+        # TOOD: not greedy
+        weights = np.asarray([1 - 0.05 if q == max_q else 0.05 for q in q_values])
+        return np.random.choice(actions, p=weights/sum(weights))
+
+    def update(self, episode):
+        pass
+
+    def finalize(self, episode):
+        b = get_eps_greedy_policy(self.Q, 0)
+
+        G = 0.0
+        W = 1
+        for t in range(len(episode) - 1, -1, -1):
+            s = episode[t].state
+            a = episode[t].action
+            r = episode[t].reward
+            G = 0.95 * G + r
+            self.C[s, a] += W
+            self.Q[s, a] += W / self.C[s, a] * (G - self.Q[s, a])
+            if a != np.argmax([self.Q[s, a] for a in range(4)]):
+                break
+            W *= 1 / b[s, a]
 
 @with_default_values
 def off_policy_mc(
@@ -289,6 +388,52 @@ def off_policy_mc(
 
     return False, pi, step
 
+class OffPolicyMCNonInc(TDMethod):
+    def __init__(self):
+        self.Q = defaultdict(float)
+        self.returns = defaultdict(list)
+        self.ratios = defaultdict(list)
+
+    def act(self, state, mask):
+        actions = np.nonzero(mask)[0].tolist()
+        q_values = [self.Q[(state, a)] for a in actions]
+        max_q = max(q_values)
+        # TOOD: not greedy
+        weights = np.asarray([1 - 0.05 if q == max_q else 0.05 for q in q_values])
+        return np.random.choice(actions, p=weights/sum(weights))
+
+    def update(self, episode):
+        pass
+
+    def finalize(self, episode):
+        b = get_eps_greedy_policy(self.Q, 0)
+
+        G = 0.0
+        ratio = 1
+        for t in range(len(episode) - 1, -1, -1):
+            s = episode[t].state
+            a = episode[t].action
+            r = episode[t].reward
+            G = 0.95 * G + r
+
+            # Create current target policy,
+            # which is the argmax of the Q function,
+            # but gives equal weighting to tied Q values
+            pi = np.zeros_like(self.Q)
+            pi[np.arange(16), np.argmax(self.Q, 1)] = 1
+            uniform_rows = np.all(self.Q == self.Q[:, [0]], axis=1)
+            pi[uniform_rows] = 1 / 4
+
+            ratio *= pi[s, a] / b[s, a]
+            if ratio == 0:
+                break
+
+            self.returns[s, a].append(G)
+            self.ratios[s, a].append(ratio)
+
+            self.Q[s, a] = sum([r * s for r, s in zip(self.returns[s, a], self.ratios[s, a])]) / sum(
+                [s for s in self.ratios[s, a]]
+            )
 
 @with_default_values
 def off_policy_mc_non_inc(

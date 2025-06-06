@@ -1,5 +1,7 @@
+from collections import defaultdict
 import math
 from dataclasses import dataclass
+import random
 from typing import Callable
 
 import numpy as np
@@ -7,6 +9,7 @@ import numpy as np
 from rl_book.env import ParametrizedEnv
 from rl_book.gym_utils import get_observation_action_space
 from rl_book.methods.method_wrapper import with_default_values
+from rl_book.methods.td import TDMethod
 from rl_book.utils import div_with_zero, get_eps_greedy_action, get_policy
 
 
@@ -19,7 +22,84 @@ class ReplayItem:
 
 ALPHA = 0.1
 
+class SarsaN(TDMethod):
+    def __init__(self, n: int = 3):
+        self.Q = defaultdict(float)
+        self.n = n
 
+    def finalize(self, replay_buffer):
+        for tau in range(len(replay_buffer) - self.n - 1, len(replay_buffer)):
+            self.update(replay_buffer, tau)
+
+    def update(self, replay_buffer, tau = None):
+        is_final = True
+        if tau is None:
+            tau = len(replay_buffer) - self.n - 1
+            is_final = False
+
+        print(f"{tau} -- {len(replay_buffer)}")
+        b = self.Q
+        rhos = []
+        # T = len(replay_buffer) - 1
+
+        if tau >= 0:
+            # rho = math.prod(
+            #     [
+            #         div_with_zero(
+            #             self.Q[replay_buffer[i].state, replay_buffer[i].action],
+            #             b[replay_buffer[i].state, replay_buffer[i].action],
+            #         )
+            #         for i in range(tau + 1, tau + self.n + 1)
+            #     ]
+            # )
+            rho = 1
+            rhos.append(rho)
+
+            G = sum(
+                [
+                    replay_buffer[i].reward * 0.95 ** (i - tau)
+                    for i in range(tau, min(tau + self.n, len(replay_buffer)))
+                ]
+            )
+
+            if not is_final:
+                print("extend")
+                # import ipdb
+                # ipdb.set_trace()
+                G = (
+                    G
+                    + 0.95**self.n
+                    * self.Q[replay_buffer[tau + self.n].state, replay_buffer[tau + self.n].action]
+                )
+
+            # import ipdb
+            # ipdb.set_trace()
+
+            # if G != 0:
+            #     import ipdb
+            #     ipdb.set_trace()
+
+            self.Q[replay_buffer[tau].state, replay_buffer[tau].action] = self.Q[
+                replay_buffer[tau].state, replay_buffer[tau].action
+            ] + ALPHA * rho / (sum(rhos) + 1) * (
+                G - self.Q[replay_buffer[tau].state, replay_buffer[tau].action]
+            )
+
+    # TODO: share
+    def act(self, state, mask):
+        q_values = [self.Q[(state, a)] for a in np.nonzero(mask)[0].tolist()]
+        max_q = max(q_values)
+
+        eps_greedy = random.randint(0, 100)
+
+        # TODO: eps greedy?
+        max_actions = [a for a, q in zip(np.nonzero(mask)[0].tolist(), q_values) if q == max_q or eps_greedy <= 5]
+
+        # import ipdb
+        # ipdb.set_trace()
+        
+        return random.choice(max_actions)
+    
 @with_default_values
 def sarsa_n(
     env: ParametrizedEnv,
