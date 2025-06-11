@@ -72,7 +72,7 @@ def policy_iteration(
                 V[s] = sum(
                     [
                         p * (r + env.gamma * V[s_next])
-                        for p, s_next, r, _ in env.env.P[s][pi[s]]  # type: ignore
+                        for p, s_next, r, _ in env.env.unwrapped.P[s][pi[s]]  # type: ignore
                     ]
                 )
                 delta = max(delta, abs(v - V[s]))
@@ -88,7 +88,7 @@ def policy_iteration(
                 [
                     p * (r + env.gamma * V[s_next])
                     for a in range(action_space.n)
-                    for p, s_next, r, _ in env.env.P[s][a]  # type: ignore
+                    for p, s_next, r, _ in env.env.unwrapped.P[s][a]  # type: ignore
                 ]
             )
 

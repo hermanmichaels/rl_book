@@ -7,9 +7,11 @@ import numpy as np
 
 from rl_book.env import ParametrizedEnv
 from rl_book.gym_utils import get_observation_action_space
+from rl_book.methods.method import Algorithm
 from rl_book.methods.method_wrapper import with_default_values
 from rl_book.methods.td import ALPHA, get_eps_greedy_action
 from rl_book.utils import get_policy
+import copy
 
 NUM_STEPS = 1000
 NUM_MCTS_ITERATIONS = 1000
@@ -28,61 +30,63 @@ class ReplayBuffer:
     def sample(self) -> tuple[int, int]:
         return self.replay_buffer[random.randint(0, len(self.replay_buffer) - 1)]
 
-@with_default_values
-def dyna_q(
-    env: ParametrizedEnv,
-    success_cb: Callable[[np.ndarray, int], bool],
-    max_steps: int,
-    n: int = 3,
-    plus_mode: bool = False,
-) -> tuple[bool, np.ndarray, int]:
-    observation_space, action_space = get_observation_action_space(env)
-    Q = np.zeros((observation_space.n, action_space.n))
-    model = np.zeros((observation_space.n, action_space.n, 3))
+class DynaQ(Algorithm):
+    def __init__(self, env, n = 3, plus_mode: bool = False,):
+        super().__init__(env)
+        self.Q = defaultdict(float)
+        self.n = n
+        self.buffer = ReplayBuffer()
+        self.model = np.zeros((self.env.env.observation_space.n, self.env.env.action_space.n, 3))
+        self.plus_mode = plus_mode
 
-    buffer = ReplayBuffer()
-    t = 0
-    kappa = 0
+    def clone(self):
+        cloned = self.__class__()
+        cloned.Q = copy.deepcopy(self.Q)
+        return cloned
+    
 
-    for step in range(max_steps):
-        observation, _ = env.env.reset()
-        terminated = truncated = False
-        action = get_eps_greedy_action(Q[observation], env.eps(step))
+    def act(self, state, mask, step):
+        allowed_actions = np.nonzero(mask)[0].tolist()
 
-        while not terminated and not truncated:
-            action = get_eps_greedy_action(Q[observation])
-            buffer.push(observation, action)
-            t += 1
+        if random.uniform(0, 1) < self.env.eps(step):
+            return random.choice(allowed_actions)
+        else:
+            q_values = [self.Q[state, a] for a in allowed_actions]
+            max_q = max(q_values)
+            max_actions = [a for a, q in zip(allowed_actions, q_values) if q == max_q]
+            return random.choice(max_actions)
+        
+    def update(self, episode, step):
+        if episode:
+            self.buffer.push(episode[-1].state, episode[-1].action)
 
-            observation_new, reward, terminated, truncated, _ = env.step(
-                action, observation
+        if len(episode) <= 1:
+            return
+        
+        kappa = 0 # ?
+        
+        # prev_state = episode[len(episode) - 2]
+        cur_state = episode[len(episode) - 2]
+        next_state = episode[len(episode) - 1]
+        next_q = max([self.Q[next_state.state, a_] for a_ in range(len(cur_state.mask))], default=0) # TODO: maks # tood: right mask index?
+        self.Q[cur_state.state, cur_state.action] = self.Q[cur_state.state, cur_state.action] + ALPHA * (
+                        cur_state.reward + self.env.gamma * next_q - self.Q[cur_state.state, cur_state.action]
+                        )
+        
+        for _ in range(self.n):
+            observation, action = self.buffer.sample()
+            observation_new_sampled, reward, t_last = self.model[observation, action]
+            bonus_reward = kappa * np.sqrt(t - t_last) if self.plus_mode else 0.0
+            self.Q[observation, action] = self.Q[observation, action] + ALPHA * (
+                (float(reward) + bonus_reward)
+                + self.env.gamma * np.max(self.Q[int(observation_new_sampled)])
+                - self.Q[observation, action]
             )
-            Q[observation, action] = Q[observation, action] + ALPHA * (
-                float(reward)
-                + env.gamma * np.max(Q[observation_new])
-                - Q[observation, action]
-            )
-            model[observation, action] = observation_new, reward, t
-
-            for _ in range(n):
-                observation, action = buffer.sample()
-                observation_new_sampled, reward, t_last = model[observation, action]
-                bonus_reward = kappa * np.sqrt(t - t_last) if plus_mode else 0.0
-                Q[observation, action] = Q[observation, action] + ALPHA * (
-                    (float(reward) + bonus_reward)
-                    + env.gamma * np.max(Q[int(observation_new_sampled)])
-                    - Q[observation, action]
-                )
-
-            observation = observation_new
-
-        pi = get_policy(Q, observation_space)
-        if success_cb(pi, step):
-            return True, pi, step
-
-    return False, get_policy(Q, observation_space), step
 
 
+    def get_policy(self):
+        return np.array([np.argmax([self.Q[s, a] for a in range(self.env.env.action_space.n)]) for s in range(self.env.env.observation_space.n)])
+    
 def generate_predecessor_states(
     env: ParametrizedEnv,
 ) -> dict[int, set[tuple[int, int]]]:

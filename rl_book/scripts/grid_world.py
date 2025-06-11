@@ -5,9 +5,10 @@ import gymnasium as gym
 from rl_book.env import ParametrizedEnv
 from rl_book.gym_utils import get_observation_action_space
 from rl_book.methods.dp import policy_iteration, value_iteration
-from rl_book.methods.mc import OffPolicyMC, OffPolicyMCNonInc, OnPolicyMC, off_policy_mc, off_policy_mc_non_inc, on_policy_mc
-from rl_book.methods.td import DoubleQ, ExpectedSarsa, QLearning, Sarsa, double_q, expected_sarsa, q, sarsa
-from rl_book.methods.td_n import SarsaN, TreeN, sarsa_n, tree_n
+from rl_book.methods.mc import OffPolicyMC, OffPolicyMCNonInc, OnPolicyMC
+from rl_book.methods.planning import DynaQ
+from rl_book.methods.td import DoubleQ, ExpectedSarsa, QLearning, Sarsa
+from rl_book.methods.td_n import SarsaN, TreeN
 from rl_book.replay_utils import ReplayItem
 from rl_book.utils import get_policy
 
@@ -17,10 +18,10 @@ NUM_STEPS = 100
 
 
 def train(env, method):
-    observation_space, action_space = get_observation_action_space(env)
+    _, action_space = get_observation_action_space(env)
+    all_valid_mask = [1 for _ in range(action_space.n)] # TODO: optional?
 
-    for step in range(10000):
-        # print(step)
+    for step in range(20000):
         observation, _ = env.env.reset()
         terminated = truncated = False
 
@@ -28,26 +29,23 @@ def train(env, method):
         episode = []
 
         while not terminated and not truncated:
-            action = method.act(observation, [1 for _ in range(action_space.n)], step)
+            action = method.act(observation, all_valid_mask, step)
 
-            # import ipdb
-            # ipdb.set_trace()
             observation_new, reward, terminated, truncated, _ = env.step(
                 action, observation
             )
 
-            episode.append(ReplayItem(observation, action, reward, [1 for _ in range(action_space.n)]))
-            method.update(episode)
+            episode.append(ReplayItem(observation, action, reward, all_valid_mask))
+            method.update(episode, step)
 
             observation = observation_new
 
             cur_episode_len += 1
-            # print(cur_episode_len)
 
-        episode.append(ReplayItem(observation_new, -1, reward, []))
+        episode.append(ReplayItem(observation_new, -1, reward, [])) # why? sarsa?
         method.finalize(episode, step)
 
-    pi = get_policy(method.Q, observation_space, action_space) # todo: make function of class
+    pi = method.get_policy()
 
     return False, pi, step
 
@@ -92,6 +90,8 @@ def solve_grid_world(method_name: str) -> None:
             method = SarsaN(env_train)
         elif method_name == "tree_n":
             method = TreeN(env_train)
+        elif method_name == "dyna_q":
+            method = DynaQ(env_train)
         else:
             raise ValueError(f"Unknown solution method {method_name}")
         

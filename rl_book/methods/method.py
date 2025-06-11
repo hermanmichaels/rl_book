@@ -5,7 +5,10 @@ class Algorithm(ABC):
     def __init__(self, env):
         self.env = env
 
-    def update(self, episode):
+    def act(self):
+        pass
+
+    def update(self, episode, step):
         pass
 
     def get_action(self):
