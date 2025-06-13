@@ -3,51 +3,15 @@ import argparse
 import gymnasium as gym
 
 from rl_book.env import ParametrizedEnv
-from rl_book.gym_utils import get_observation_action_space
 from rl_book.methods.dp import policy_iteration, value_iteration
 from rl_book.methods.mc import OffPolicyMC, OffPolicyMCNonInc, OnPolicyMC
 from rl_book.methods.planning import DynaQ
 from rl_book.methods.td import DoubleQ, ExpectedSarsa, QLearning, Sarsa
 from rl_book.methods.td_n import SarsaN, TreeN
-from rl_book.replay_utils import ReplayItem
-from rl_book.utils import get_policy
 
 GAMMA = 0.97
 EPS = 0.001
 NUM_STEPS = 100
-
-
-def train(env, method):
-    _, action_space = get_observation_action_space(env)
-    all_valid_mask = [1 for _ in range(action_space.n)] # TODO: optional?
-
-    for step in range(20000):
-        observation, _ = env.env.reset()
-        terminated = truncated = False
-
-        cur_episode_len = 0
-        episode = []
-
-        while not terminated and not truncated:
-            action = method.act(observation, all_valid_mask, step)
-
-            observation_new, reward, terminated, truncated, _ = env.step(
-                action, observation
-            )
-
-            episode.append(ReplayItem(observation, action, reward, all_valid_mask))
-            method.update(episode, step)
-
-            observation = observation_new
-
-            cur_episode_len += 1
-
-        episode.append(ReplayItem(observation_new, -1, reward, [])) # why? sarsa?
-        method.finalize(episode, step)
-
-    pi = method.get_policy()
-
-    return False, pi, step
 
 
 def solve_grid_world(method_name: str) -> None:
@@ -94,7 +58,7 @@ def solve_grid_world(method_name: str) -> None:
             method = DynaQ(env_train)
         else:
             raise ValueError(f"Unknown solution method {method_name}")
-        
+
         pi = train(env_train, method)[1]
 
     gym_env_train.close()

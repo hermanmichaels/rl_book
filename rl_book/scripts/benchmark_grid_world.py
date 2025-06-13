@@ -8,12 +8,13 @@ import numpy as np
 from gymnasium.core import Env
 from gymnasium.envs.toy_text.frozen_lake import generate_random_map
 
-from rl_book.env import ParametrizedEnv
+from rl_book.env import GridWorldEnv, ParametrizedEnv
 from rl_book.gym_utils import get_observation_action_space
 from rl_book.methods.dp import policy_iteration, value_iteration
 from rl_book.methods.mc import OffPolicyMC, OnPolicyMC
-from rl_book.methods.td import ExpectedSarsa, Sarsa, QLearning, DoubleQ
+from rl_book.methods.td import DoubleQ, ExpectedSarsa, QLearning, Sarsa
 from rl_book.methods.td_n import SarsaN, TreeN
+from rl_book.methods.training import train_single_player
 from rl_book.replay_utils import ReplayItem
 
 GAMMA = 0.97
@@ -22,16 +23,14 @@ MAX_STEPS = [10000, 30000, 100000, 200000]
 TRIES_PER_STEP = 3
 
 
-def generate_random_env(
-    n: int, extra_rewards: bool, eps_decay: bool
-) -> ParametrizedEnv:
+def generate_random_env(n: int, extra_rewards: bool, eps_decay: bool) -> GridWorldEnv:
     desc = generate_random_map(size=n)
     gym_env = gym.make(
         "FrozenLake-v1",
         desc=desc,
         is_slippery=False,
     )
-    return ParametrizedEnv(
+    return GridWorldEnv(
         gym_env, GAMMA, intermediate_rewards=extra_rewards, eps_decay=eps_decay
     )
 
@@ -96,45 +95,10 @@ def plot_results(
     plt.clf()
 
 
-def train(env, method, callback, max_steps):
-    _, action_space = get_observation_action_space(env)
-    all_valid_mask = [1 for _ in range(action_space.n)] # TODO: optional?
-
-    for step in range(max_steps):
-        observation, _ = env.env.reset()
-        terminated = truncated = False
-
-        cur_episode_len = 0
-        episode = []
-
-        while not terminated and not truncated:
-            action = method.act(observation, all_valid_mask, step)
-
-            observation_new, reward, terminated, truncated, _ = env.step(
-                action, observation
-            )
-
-            episode.append(ReplayItem(observation, action, reward, all_valid_mask))
-            method.update(episode, step)
-
-            observation = observation_new
-
-            cur_episode_len += 1
-
-        episode.append(ReplayItem(observation_new, -1, reward, [])) # why? sarsa?
-        method.finalize(episode, step)
-
-        if callback(method.get_policy(), step):
-            return True, method.get_policy(), step
-
-    pi = method.get_policy()
-
-    return False, pi, step
-
 def benchmark(
     methods: list,
     min_grid_size=3,
-    max_grid_size=8,
+    max_grid_size=6,
     extra_rewards: bool = True,
     eps_decay: bool = True,
     fig_path: str = "result.png",
@@ -171,7 +135,7 @@ def benchmark(
                         if not steps_needed_cur
                         else max(1, min(steps_needed_cur))
                     )
-                    success, _, step = train(env, method, callback, max_s)
+                    success, _, step = train_single_player(env, method, max_s, callback)
                     if success:
                         steps_needed_cur.append(step)
                 if steps_needed_cur:
@@ -191,10 +155,10 @@ def benchmark(
 
 if __name__ == "__main__":
     env = generate_random_env(3, True, True)
-    # benchmark(
-    #     [OnPolicyMC, OffPolicyMC],
-    #     fig_path="results/mc.png",
-    # )
+    benchmark(
+        [OnPolicyMC, OffPolicyMC],
+        fig_path="results/mc.png",
+    )
     benchmark([Sarsa, QLearning, ExpectedSarsa, DoubleQ], fig_path="results/td.png")
     benchmark([SarsaN, TreeN], fig_path="results/td_n_.png")
     # benchmark(

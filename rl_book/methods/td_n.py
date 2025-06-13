@@ -1,16 +1,8 @@
-from collections import defaultdict
 import math
 from dataclasses import dataclass
-import random
-from typing import Callable
 
-import numpy as np
-
-from rl_book.env import ParametrizedEnv
-from rl_book.gym_utils import get_observation_action_space
-from rl_book.methods.method_wrapper import with_default_values
 from rl_book.methods.td import TDMethod
-from rl_book.utils import div_with_zero, get_eps_greedy_action, get_policy
+from rl_book.utils import div_with_zero
 
 
 @dataclass
@@ -22,6 +14,7 @@ class ReplayItem:
 
 ALPHA = 0.1
 
+
 class SarsaN(TDMethod):
     def __init__(self, env, n: int = 3):
         super().__init__(env)
@@ -31,7 +24,7 @@ class SarsaN(TDMethod):
         for tau in range(len(replay_buffer) - self.n - 1, len(replay_buffer)):
             self.update(replay_buffer, step, tau)
 
-    def update(self, replay_buffer, step, tau = None):
+    def update(self, replay_buffer, step, tau=None):
         is_final = True
         if tau is None:
             tau = len(replay_buffer) - self.n - 1
@@ -63,7 +56,10 @@ class SarsaN(TDMethod):
                 G = (
                     G
                     + self.env.gamma**self.n
-                    * self.Q[replay_buffer[tau + self.n].state, replay_buffer[tau + self.n].action]
+                    * self.Q[
+                        replay_buffer[tau + self.n].state,
+                        replay_buffer[tau + self.n].action,
+                    ]
                 )
 
             self.Q[replay_buffer[tau].state, replay_buffer[tau].action] = self.Q[
@@ -72,7 +68,7 @@ class SarsaN(TDMethod):
                 G - self.Q[replay_buffer[tau].state, replay_buffer[tau].action]
             )
 
-    
+
 class TreeN(TDMethod):
     def __init__(self, env, n: int = 3):
         super().__init__(env)
@@ -82,7 +78,7 @@ class TreeN(TDMethod):
         for tau in range(len(replay_buffer) - self.n - 1, len(replay_buffer)):
             self.update(replay_buffer, step, tau)
 
-    def update(self, replay_buffer, step, tau = None):
+    def update(self, replay_buffer, step, tau=None):
         is_final = True
         if tau is None:
             tau = len(replay_buffer) - self.n - 1
@@ -97,7 +93,10 @@ class TreeN(TDMethod):
                 G = replay_buffer[-1].reward + 0.95 * sum(
                     [
                         self.Q[replay_buffer[-1].state, a]
-                        / (sum([self.Q[replay_buffer[-1].state, a] for a in range(4)])  + 0.001)
+                        / (
+                            sum([self.Q[replay_buffer[-1].state, a] for a in range(4)])
+                            + 0.001
+                        )
                         * self.Q[replay_buffer[-1].state, a]
                         for a in range(4)
                     ]
@@ -110,7 +109,15 @@ class TreeN(TDMethod):
                         * sum(
                             [
                                 self.Q[replay_buffer[k].state, a]
-                                / (sum([self.Q[replay_buffer[k].state, a] for a in range(self.env.env.action_space.n)]) + 0.001)
+                                / (
+                                    sum(
+                                        [
+                                            self.Q[replay_buffer[k].state, a]
+                                            for a in range(self.env.env.action_space.n)
+                                        ]
+                                    )
+                                    + 0.001
+                                )
                                 * self.Q[replay_buffer[k].state, a]
                                 for a in range(self.env.env.action_space.n)
                                 if a != replay_buffer[k].action
@@ -118,11 +125,20 @@ class TreeN(TDMethod):
                         )
                         + self.env.gamma
                         * self.Q[replay_buffer[k].state, replay_buffer[k].action]
-                        / (sum([self.Q[replay_buffer[k].state, a] for a in range(self.env.env.action_space.n)]) + 0.001)
+                        / (
+                            sum(
+                                [
+                                    self.Q[replay_buffer[k].state, a]
+                                    for a in range(self.env.env.action_space.n)
+                                ]
+                            )
+                            + 0.001
+                        )
                         * G
                     )
 
                 self.Q[replay_buffer[tau].state, replay_buffer[tau].action] = self.Q[
                     replay_buffer[tau].state, replay_buffer[tau].action
-                ] + ALPHA * (G - self.Q[replay_buffer[tau].state, replay_buffer[tau].action])
-
+                ] + ALPHA * (
+                    G - self.Q[replay_buffer[tau].state, replay_buffer[tau].action]
+                )

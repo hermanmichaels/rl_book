@@ -1,3 +1,4 @@
+import copy
 import heapq
 import random
 from collections import defaultdict
@@ -11,7 +12,6 @@ from rl_book.methods.method import Algorithm
 from rl_book.methods.method_wrapper import with_default_values
 from rl_book.methods.td import ALPHA, get_eps_greedy_action
 from rl_book.utils import get_policy
-import copy
 
 NUM_STEPS = 1000
 NUM_MCTS_ITERATIONS = 1000
@@ -30,20 +30,27 @@ class ReplayBuffer:
     def sample(self) -> tuple[int, int]:
         return self.replay_buffer[random.randint(0, len(self.replay_buffer) - 1)]
 
+
 class DynaQ(Algorithm):
-    def __init__(self, env, n = 3, plus_mode: bool = False,):
+    def __init__(
+        self,
+        env,
+        n=3,
+        plus_mode: bool = False,
+    ):
         super().__init__(env)
         self.Q = defaultdict(float)
         self.n = n
         self.buffer = ReplayBuffer()
-        self.model = np.zeros((self.env.env.observation_space.n, self.env.env.action_space.n, 3))
+        self.model = np.zeros(
+            (self.env.env.observation_space.n, self.env.env.action_space.n, 3)
+        )
         self.plus_mode = plus_mode
 
     def clone(self):
         cloned = self.__class__()
         cloned.Q = copy.deepcopy(self.Q)
         return cloned
-    
 
     def act(self, state, mask, step):
         allowed_actions = np.nonzero(mask)[0].tolist()
@@ -55,24 +62,31 @@ class DynaQ(Algorithm):
             max_q = max(q_values)
             max_actions = [a for a, q in zip(allowed_actions, q_values) if q == max_q]
             return random.choice(max_actions)
-        
+
     def update(self, episode, step):
         if episode:
             self.buffer.push(episode[-1].state, episode[-1].action)
 
         if len(episode) <= 1:
             return
-        
-        kappa = 0 # ?
-        
+
+        kappa = 0  # ?
+
         # prev_state = episode[len(episode) - 2]
         cur_state = episode[len(episode) - 2]
         next_state = episode[len(episode) - 1]
-        next_q = max([self.Q[next_state.state, a_] for a_ in range(len(cur_state.mask))], default=0) # TODO: maks # tood: right mask index?
-        self.Q[cur_state.state, cur_state.action] = self.Q[cur_state.state, cur_state.action] + ALPHA * (
-                        cur_state.reward + self.env.gamma * next_q - self.Q[cur_state.state, cur_state.action]
-                        )
-        
+        next_q = max(
+            [self.Q[next_state.state, a_] for a_ in range(len(cur_state.mask))],
+            default=0,
+        )  # TODO: maks # tood: right mask index?
+        self.Q[cur_state.state, cur_state.action] = self.Q[
+            cur_state.state, cur_state.action
+        ] + ALPHA * (
+            cur_state.reward
+            + self.env.gamma * next_q
+            - self.Q[cur_state.state, cur_state.action]
+        )
+
         for _ in range(self.n):
             observation, action = self.buffer.sample()
             observation_new_sampled, reward, t_last = self.model[observation, action]
@@ -83,10 +97,15 @@ class DynaQ(Algorithm):
                 - self.Q[observation, action]
             )
 
-
     def get_policy(self):
-        return np.array([np.argmax([self.Q[s, a] for a in range(self.env.env.action_space.n)]) for s in range(self.env.env.observation_space.n)])
-    
+        return np.array(
+            [
+                np.argmax([self.Q[s, a] for a in range(self.env.env.action_space.n)])
+                for s in range(self.env.env.observation_space.n)
+            ]
+        )
+
+
 def generate_predecessor_states(
     env: ParametrizedEnv,
 ) -> dict[int, set[tuple[int, int]]]:
@@ -107,6 +126,7 @@ def generate_predecessor_states(
             predecessors[next_state].add((state, action))
 
     return predecessors
+
 
 @with_default_values
 def prioritized_sweeping(

@@ -1,5 +1,5 @@
 from abc import ABC
-import copy
+
 
 class Algorithm(ABC):
     def __init__(self, env):
@@ -19,7 +19,7 @@ class Algorithm(ABC):
 
     def get_policy(self):
         raise NotImplementedError
-    
+
     def clone(self):
         cloned = self.__class__()
         return cloned

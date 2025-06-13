@@ -24,4 +24,9 @@ def get_policy(Q, observation_space: Discrete, action_space) -> np.ndarray:
     # pp = np.array([np.argmax([Q[s, a] for a in range(action_space.n)]) for s in range(observation_space.n)])
     # import ipdb
     # ipdb.set_trace()
-    return np.array([np.argmax([Q[s, a] for a in range(action_space.n)]) for s in range(observation_space.n)])
+    return np.array(
+        [
+            np.argmax([Q[s, a] for a in range(action_space.n)])
+            for s in range(observation_space.n)
+        ]
+    )
