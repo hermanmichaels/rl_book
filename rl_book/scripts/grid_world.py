@@ -2,18 +2,21 @@ import argparse
 
 import gymnasium as gym
 
-from rl_book.env import ParametrizedEnv
+from rl_book.env import GridWorldEnv
 from rl_book.methods.dp import policy_iteration, value_iteration
-from rl_book.methods.mc import mc_es, off_policy_mc, off_policy_mc_non_inc, on_policy_mc
-from rl_book.methods.td import double_q, expected_sarsa, q, sarsa
-from rl_book.methods.td_n import sarsa_n, tree_n
+from rl_book.methods.inference import test_single_player
+from rl_book.methods.mc import OffPolicyMC, OffPolicyMCNonInc, OnPolicyMC
+# from rl_book.methods.planning import DynaQ
+from rl_book.methods.td import DoubleQ, ExpectedSarsa, QLearning, Sarsa
+from rl_book.methods.td_n import SarsaN, TreeN
+from rl_book.methods.training import train_single_player
 
 GAMMA = 0.97
 EPS = 0.001
 NUM_STEPS = 100
 
 
-def solve_grid_world(method: str) -> None:
+def solve_grid_world(method_name: str) -> None:
     """Solve the grid world problem using the chosen solving method.
 
     Args:
@@ -25,38 +28,40 @@ def solve_grid_world(method: str) -> None:
         map_name="4x4",
         is_slippery=False,
     )
-    env_train = ParametrizedEnv(
+    env_train = GridWorldEnv(
         gym_env_train, GAMMA, intermediate_rewards=True, eps_decay=True
     )
 
     # Find policy
-    if method == "policy_iteration":
-        pi = policy_iteration(env_train)[1]
-    elif method == "value_iteration":
-        pi = value_iteration(env_train)[1]
-    elif method == "mc_es":
-        pi = mc_es(env_train)[1]
-    elif method == "on_policy_mc":
-        pi = on_policy_mc(env_train)[1]
-    elif method == "off_policy_mc":
-        pi = off_policy_mc(env_train)[1]
-    elif method == "off_policy_mc_non_inc":
-        pi = off_policy_mc_non_inc(env_train)[1]
-    elif method == "sarsa":
-        pi = sarsa(env_train)[1]
-    elif method == "q":
-        pi = q(env_train)[1]
-    elif method == "expected_sarsa":
-        pi = expected_sarsa(env_train)[1]
-    elif method == "double_q":
-        pi = double_q(env_train)[1]
-    elif method == "sarsa_n":
-        pi = sarsa_n(env_train)[1]
-    elif method == "tree_n":
-        pi = tree_n(env_train)[1]
+    if method_name == "policy_iteration":
+        method = policy_iteration(env_train, 100)
+    elif method_name == "value_iteration":
+        method = value_iteration(env_train, 100)
     else:
-        raise ValueError(f"Unknown solution method {method}")
-    gym_env_train.close()
+        if method_name == "on_policy_mc":
+            method = OnPolicyMC(env_train)
+        elif method_name == "off_policy_mc":
+            method = OffPolicyMC(env_train)
+        elif method_name == "off_policy_mc_non_inc":
+            method = OffPolicyMCNonInc(env_train)
+        elif method_name == "sarsa":
+            method = Sarsa(env_train)
+        elif method_name == "q":
+            method = QLearning(env_train)
+        elif method_name == "expected_sarsa":
+            method = ExpectedSarsa(env_train)
+        elif method_name == "double_q":
+            method = DoubleQ(env_train)
+        elif method_name == "sarsa_n":
+            method = SarsaN(env_train)
+        elif method_name == "tree_n":
+            method = TreeN(env_train)
+        elif method_name == "dyna_q":
+            method = DynaQ(env_train)
+        else:
+            raise ValueError(f"Unknown solution method {method_name}")
+
+        train_single_player(env_train, method)[1]
 
     gym_env_test = gym.make(
         "FrozenLake-v1",
@@ -67,14 +72,7 @@ def solve_grid_world(method: str) -> None:
     )
 
     # Test policy and visualize found solution
-    observation, _ = gym_env_test.reset()
-
-    for _ in range(NUM_STEPS):
-        action = pi[observation]
-        observation, _, terminated, truncated, _ = gym_env_test.step(action)
-        if terminated or truncated:
-            break
-    gym_env_test.close()
+    test_single_player(gym_env_test, method)
 
 
 if __name__ == "__main__":

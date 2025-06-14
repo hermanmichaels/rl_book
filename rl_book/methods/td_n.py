@@ -1,13 +1,8 @@
 import math
 from dataclasses import dataclass
-from typing import Callable
 
-import numpy as np
-
-from rl_book.env import ParametrizedEnv
-from rl_book.gym_utils import get_observation_action_space
-from rl_book.methods.method_wrapper import with_default_values
-from rl_book.utils import div_with_zero, get_eps_greedy_action, get_policy
+from rl_book.methods.td import TDMethod
+from rl_book.utils import div_with_zero
 
 
 @dataclass
@@ -20,183 +15,138 @@ class ReplayItem:
 ALPHA = 0.1
 
 
-@with_default_values
-def sarsa_n(
-    env: ParametrizedEnv,
-    success_cb: Callable[[np.ndarray, int], bool],
-    max_steps: int,
-    n: int = 3,
-    off_policy: bool = False,
-) -> tuple[bool, np.ndarray, int]:
-    observation_space, action_space = get_observation_action_space(env)
-    Q = np.zeros((observation_space.n, action_space.n))
+class SarsaN(TDMethod):
+    def __init__(self, env, n: int = 3):
+        super().__init__(env)
+        self.n = n
 
-    for step in range(max_steps):
-        b = (
-            np.random.rand(int(observation_space.n), int(action_space.n))
-            if off_policy
-            else Q
-        )
+    def get_name(self) -> str:
+        return "SarsaN"
 
-        observation, _ = env.env.reset()
+    def finalize(self, replay_buffer, step):
+        for tau in range(len(replay_buffer) - self.n - 1, len(replay_buffer)):
+            self.update(replay_buffer, step, tau)
 
-        terminated = truncated = False
-        action = (
-            get_eps_greedy_action(Q[observation], env.eps(step))
-            if not off_policy
-            else get_eps_greedy_action(b[observation], eps=0)
-        )
+    def update(self, replay_buffer, step, tau=None):
+        is_final = True
+        if tau is None:
+            tau = len(replay_buffer) - self.n - 1
+            is_final = False
 
-        replay_buffer = [ReplayItem(observation, int(action), 0.0)]
+        b = self.Q
+        rhos = []
 
-        T = 2**31 - 1  # terminal step
-        t = 0  # current step
-        tau = 0  # update value estimate for this time step
+        if tau >= 0:
+            rho = math.prod(
+                [
+                    div_with_zero(
+                        self.Q[replay_buffer[i].state, replay_buffer[i].action],
+                        b[replay_buffer[i].state, replay_buffer[i].action],
+                    )
+                    for i in range(tau + 1, min(tau + self.n + 1, len(replay_buffer)))
+                ]
+            )
+            rhos.append(rho)
 
-        rhos = []  # importance sampling weights
+            G = sum(
+                [
+                    replay_buffer[i].reward * self.env.eps(step) ** (i - tau)
+                    for i in range(tau, min(tau + self.n, len(replay_buffer)))
+                ]
+            )
 
-        while True:
-            if t < T:
-                # While not terminal, continue playing episode.
-                observation_new, reward, terminated, truncated, _ = env.step(
-                    action, observation
+            if not is_final:
+                G = (
+                    G
+                    + self.env.gamma**self.n
+                    * self.Q[
+                        replay_buffer[tau + self.n].state,
+                        replay_buffer[tau + self.n].action,
+                    ]
                 )
-                action_new = get_eps_greedy_action(Q[observation_new], env.eps(step))
-                replay_buffer.append(
-                    ReplayItem(observation_new, action_new, float(reward))
-                )
-                if terminated or truncated:
-                    T = t + 1
 
-                observation = observation_new
-                action = action_new
+            self.Q[replay_buffer[tau].state, replay_buffer[tau].action] = self.Q[
+                replay_buffer[tau].state, replay_buffer[tau].action
+            ] + ALPHA * rho / (sum(rhos) + 1) * (
+                G - self.Q[replay_buffer[tau].state, replay_buffer[tau].action]
+            )
 
-            tau = t - n + 1
-            if tau >= 0:
-                rho = math.prod(
+
+class TreeN(TDMethod):
+    def __init__(self, env, n: int = 3):
+        super().__init__(env)
+        self.n = n
+
+    def get_name(self) -> str:
+        return "TreeN"
+
+    def finalize(self, replay_buffer, step):
+        for tau in range(len(replay_buffer) - self.n - 1, len(replay_buffer)):
+            self.update(replay_buffer, step, tau)
+
+    def update(self, replay_buffer, step, tau=None):
+        is_final = True
+        if tau is None:
+            tau = len(replay_buffer) - self.n - 1
+            is_final = False
+        b = self.Q
+        rhos = []
+
+        if tau >= 0:
+            if is_final:
+                G = replay_buffer[-1].reward
+            else:
+                G = replay_buffer[-1].reward + 0.95 * sum(
                     [
-                        div_with_zero(
-                            Q[replay_buffer[i].state, replay_buffer[i].action],
-                            b[replay_buffer[i].state, replay_buffer[i].action],
+                        self.Q[replay_buffer[-1].state, a]
+                        / (
+                            sum([self.Q[replay_buffer[-1].state, a] for a in range(4)])
+                            + 0.001
                         )
-                        for i in range(tau + 1, min(tau + n, T - 1) + 1)
-                    ]
-                )
-                rhos.append(rho)
-
-                G = sum(
-                    [
-                        replay_buffer[i].reward * env.gamma ** (i - tau - 1)
-                        for i in range(tau + 1, min(tau + n, T) + 1)
+                        * self.Q[replay_buffer[-1].state, a]
+                        for a in range(4)
                     ]
                 )
 
-                if tau + n < T:
-                    G = (
-                        G
-                        + env.gamma**n
-                        * Q[replay_buffer[tau + n].state, replay_buffer[tau + n].action]
-                    )
-
-                Q[replay_buffer[tau].state, replay_buffer[tau].action] = Q[
-                    replay_buffer[tau].state, replay_buffer[tau].action
-                ] + ALPHA * rho / (sum(rhos) + 1) * (
-                    G - Q[replay_buffer[tau].state, replay_buffer[tau].action]
-                )
-
-            if tau == T - 1:
-                break
-
-            t += 1
-
-        pi = get_policy(Q, observation_space)
-        if success_cb(pi, step):
-            return True, pi, step
-
-    return False, get_policy(Q, observation_space), step
-
-
-@with_default_values
-def tree_n(
-    env: ParametrizedEnv,
-    success_cb: Callable[[np.ndarray, int], bool],
-    max_steps: int,
-    n: int = 3,
-) -> tuple[bool, np.ndarray, int]:
-    observation_space, action_space = get_observation_action_space(env)
-    Q = np.zeros((observation_space.n, action_space.n)) + 0.1
-
-    for step in range(max_steps):
-        observation, _ = env.env.reset()
-        terminated = truncated = False
-        action = get_eps_greedy_action(Q[observation], env.eps(step))
-
-        replay_buffer = [ReplayItem(observation, action, 0.0)]
-
-        T = 2**31 - 1  # terminal step
-        t = 0  # current step
-        tau = 0  # update value estimate for this time step
-
-        while True:
-            if t < T:
-                observation_new, reward, terminated, truncated, _ = env.step(
-                    action, observation
-                )
-                action_new = get_eps_greedy_action(Q[observation_new], env.eps(step))
-                replay_buffer.append(
-                    ReplayItem(observation_new, action_new, float(reward))
-                )
-                if terminated or truncated:
-                    T = t + 1
-
-                observation = observation_new
-                action = action_new
-
-            tau = t - n + 1
-
-            if tau >= 0:
-                if t + 1 >= T:
-                    G = replay_buffer[T].reward
-                else:
-                    G = replay_buffer[t + 1].reward + env.gamma * sum(
-                        [
-                            Q[replay_buffer[t + 1].state, a]
-                            / sum(Q[replay_buffer[t + 1].state, :])
-                            * Q[replay_buffer[t + 1].state, a]
-                            for a in range(action_space.n)
-                        ]
-                    )
-
-                for k in range(min(t, T - 1), tau + 1, -1):
+                for k in range(tau, min(tau + self.n, len(replay_buffer))):
                     G = (
                         replay_buffer[k].reward
-                        + env.gamma
+                        + self.env.gamma
                         * sum(
                             [
-                                Q[replay_buffer[k].state, a]
-                                / sum(Q[replay_buffer[k].state, :])
-                                * Q[replay_buffer[k].state, a]
-                                for a in range(action_space.n)
+                                self.Q[replay_buffer[k].state, a]
+                                / (
+                                    sum(
+                                        [
+                                            self.Q[replay_buffer[k].state, a]
+                                            for a in range(
+                                                self.env.get_action_space_len()
+                                            )
+                                        ]
+                                    )
+                                    + 0.001
+                                )
+                                * self.Q[replay_buffer[k].state, a]
+                                for a in range(self.env.get_action_space_len())
                                 if a != replay_buffer[k].action
                             ]
                         )
-                        + env.gamma
-                        * Q[replay_buffer[k].state, replay_buffer[k].action]
-                        / sum(Q[replay_buffer[k].state, :])
+                        + self.env.gamma
+                        * self.Q[replay_buffer[k].state, replay_buffer[k].action]
+                        / (
+                            sum(
+                                [
+                                    self.Q[replay_buffer[k].state, a]
+                                    for a in range(self.env.get_action_space_len())
+                                ]
+                            )
+                            + 0.001
+                        )
                         * G
                     )
 
-                Q[replay_buffer[tau].state, replay_buffer[tau].action] = Q[
+                self.Q[replay_buffer[tau].state, replay_buffer[tau].action] = self.Q[
                     replay_buffer[tau].state, replay_buffer[tau].action
-                ] + ALPHA * (G - Q[replay_buffer[tau].state, replay_buffer[tau].action])
-
-            if tau == T - 1:
-                break
-
-            t += 1
-
-        pi = get_policy(Q, observation_space)
-        if success_cb(pi, step):
-            return True, pi, step
-
-    return False, get_policy(Q, observation_space), step
+                ] + ALPHA * (
+                    G - self.Q[replay_buffer[tau].state, replay_buffer[tau].action]
+                )

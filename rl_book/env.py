@@ -1,19 +1,18 @@
-from dataclasses import dataclass
-
 import numpy as np
-from gymnasium.core import Env
+from gymnasium.core import Env  # TODO: or any other env
 from gymnasium.spaces import Discrete
 
 
-@dataclass
 class ParametrizedEnv:
-    env: Env
-    gamma: float
-    _eps_end: float = 0.05
-    _eps_start: float = 1
-    _num_decay_steps: int = 1000
-    intermediate_rewards: bool = False
-    eps_decay: bool = False
+    """Custom wrapper around Gymnasium (or other) envs."""
+
+    def __init__(self, env: Env, gamma: float, eps_decay: bool) -> None:
+        self.env = env
+        self.gamma = gamma
+        self.eps_end: float = 0.05
+        self.eps_start: float = 0.9  # TOOD: 1 crashes with MC
+        self.num_decay_steps: int = 1000
+        self.eps_decay = eps_decay
 
     def eps(self, step: int) -> float:
         """Returns exploration factor depending on current step.
@@ -26,14 +25,34 @@ class ParametrizedEnv:
             - otherwise linearly decaying value
         """
         return (
-            self._eps_end
+            self.eps_end
             if not self.eps_decay
             else max(
-                self._eps_end,
-                self._eps_start
-                - step * (self._eps_start - self._eps_end) / self._num_decay_steps,
+                self.eps_end,
+                self.eps_start
+                - step * (self.eps_start - self.eps_end) / self.num_decay_steps,
             )
         )
+
+    def obs_to_state(state):
+        return state
+
+    def get_action_space_len(self) -> int:
+        return self.env.action_space.n
+
+    def get_observation_space_len(self) -> int:
+        return self.env.observation_space.n
+
+
+class GridWorldEnv(ParametrizedEnv):
+    """Env wrapper for "Grid world"."""
+
+    def __init__(
+        self, env: Env, gamma: float, eps_decay: bool, intermediate_rewards: bool
+    ) -> None:
+        super().__init__(env, gamma, eps_decay)
+
+        self.intermediate_rewards = intermediate_rewards
 
     def normalized_grid_position_sum(self, observation: int) -> float:
         """Computes the normalized row / column index of the passed observation.
@@ -69,3 +88,87 @@ class ParametrizedEnv:
                 observation
             ) - self.normalized_grid_position_sum(old_obs)
         return observation, reward, terminated, truncated, info
+
+
+class MultiPlayerEnv(ParametrizedEnv):
+    """Wrapper around multi-player game envs.
+    Atm only 2-player games are supported."""
+
+    def __init__(
+        self, env: Env, gamma: float, players: list[str]
+    ) -> None:  # TODO: wrong env
+        super().__init__(env, gamma, True)
+        if not len(players) == 2:
+            raise ValueError(f"Expected two players, but got {players}")
+        self.players = players
+
+    def get_action_space_len(self) -> int:
+        return self.env.action_space(self.players[0]).n
+
+    def get_observation_space_len(self) -> int:
+        raise NotImplementedError
+
+
+class TicTacToeEnv(MultiPlayerEnv):
+    """TicTacToe env."""
+
+    def __init__(self, env: Env, gamma=0.95):
+        super().__init__(env, gamma, ["player_1", "player_2"])
+
+    def get_observation_space_len(self):
+        return 3 ** (6 * 7 * 3 * 2)  # TODO?
+
+    def obs_to_state(self, obs, start_pos=None):
+        board = obs  # shape: (3, 3, 2)
+        state_flat = []
+
+        for row in range(3):
+            for col in range(3):
+                if board[row][col][0] == 1:
+                    state_flat.append(1)  # player 1
+                elif board[row][col][1] == 1:
+                    state_flat.append(2)  # player 2
+                else:
+                    state_flat.append(0)  # empty
+
+        if start_pos:
+            state_flat.append(start_pos)
+
+        # Convert base-3 list to integer
+        state = 0
+        for i, val in enumerate(state_flat):
+            state += val * (3**i)
+        return state
+
+
+class ConnectFourEnv(MultiPlayerEnv):
+    """ConnectFour env."""
+
+    def __init__(self, env: Env, gamma=0.95) -> None:
+        super().__init__(env, gamma, ["player_0", "player_1"])
+
+    def get_observation_space_len(self):
+        return 3 ** (6 * 7 * 3 * 2)  # TODO?
+
+    def obs_to_state(self, state, start_pos=None):
+        board = state  # shape: (6, 7, 2)
+        state_flat = []
+
+        for row in range(6):
+            for col in range(7):
+                if board[row][col][0] == 1:
+                    state_flat.append(1)  # player 1
+                elif board[row][col][1] == 1:
+                    state_flat.append(2)  # player 2
+                else:
+                    state_flat.append(0)  # empty
+
+        if start_pos is not None:
+            state_flat.append(start_pos)
+
+        # Convert to base-3 integer
+        state = 0
+        for i, val in enumerate(state_flat):
+            state += val * (3**i)
+
+        return state
