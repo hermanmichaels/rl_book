@@ -47,7 +47,7 @@ def train_single_player(
 
         if callback and callback(method.get_policy(), step):
             return True, method.get_policy(), step
-        
+
     env.env.close()
 
     # TOOD: need to return policy?

@@ -1,6 +1,7 @@
 NUM_STEPS = 1000
 
-def test_single_player(env, method):    
+
+def test_single_player(env, method):
     # Test policy and visualize found solution
     observation, _ = env.reset()
 
@@ -10,6 +11,7 @@ def test_single_player(env, method):
         if terminated or truncated:
             break
     env.close()
+
 
 def test_again_user(env, method):
     env.env.reset()

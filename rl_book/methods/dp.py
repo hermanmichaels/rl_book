@@ -1,7 +1,4 @@
-from typing import Callable
-
 import numpy as np
-from gymnasium.spaces import Discrete
 
 from rl_book.env import ParametrizedEnv
 from rl_book.methods.method import RLMethod
@@ -41,12 +38,13 @@ def extract_policy(
         ]
     )
 
+
 class DPMethod(RLMethod):
     def __init__(self, env, pi):
         super().__init__(env)
         self.pi = pi
 
-    def act(self, state, step, mask = None):
+    def act(self, state, step, mask=None):
         return self.pi[state]
 
 
