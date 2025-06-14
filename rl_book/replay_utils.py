@@ -6,4 +6,4 @@ class ReplayItem:
     state: int
     action: int
     reward: float
-    mask: bool
+    mask: bool | None = None

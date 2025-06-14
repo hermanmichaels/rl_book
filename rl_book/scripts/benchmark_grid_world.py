@@ -8,14 +8,11 @@ import numpy as np
 from gymnasium.core import Env
 from gymnasium.envs.toy_text.frozen_lake import generate_random_map
 
-from rl_book.env import GridWorldEnv, ParametrizedEnv
-from rl_book.gym_utils import get_observation_action_space
-from rl_book.methods.dp import policy_iteration, value_iteration
+from rl_book.env import GridWorldEnv
 from rl_book.methods.mc import OffPolicyMC, OnPolicyMC
 from rl_book.methods.td import DoubleQ, ExpectedSarsa, QLearning, Sarsa
 from rl_book.methods.td_n import SarsaN, TreeN
 from rl_book.methods.training import train_single_player
-from rl_book.replay_utils import ReplayItem
 
 GAMMA = 0.97
 MAX_INFERENCE_STEPS = 1000

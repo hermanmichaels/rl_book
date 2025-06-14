@@ -4,12 +4,12 @@ from collections import defaultdict
 
 import numpy as np
 
-from rl_book.methods.method import Algorithm
+from rl_book.methods.method import RLMethod
 
 ALPHA = 0.1
 
 
-class TDMethod(Algorithm):
+class TDMethod(RLMethod):
     def __init__(self, env):
         super().__init__(env)
         self.Q = defaultdict(float)
@@ -19,9 +19,8 @@ class TDMethod(Algorithm):
         cloned.Q = copy.deepcopy(self.Q)
         return cloned
 
-    def act(self, state, mask, step):
-        allowed_actions = np.nonzero(mask)[0].tolist()
-
+    def act(self, state, step, mask=None):
+        allowed_actions = self.get_allowed_actions(mask)
         if random.uniform(0, 1) < self.env.eps(step):
             return random.choice(allowed_actions)
         else:
@@ -40,6 +39,9 @@ class TDMethod(Algorithm):
 
 
 class Sarsa(TDMethod):
+    def get_name(self) -> str:
+        return "Sarsa"
+
     def update(self, episode, step):
         if len(episode) <= 1:
             return
@@ -49,8 +51,8 @@ class Sarsa(TDMethod):
 
         # TODO :action?
 
-        if np.sum(cur_state.mask) > 0:
-            action_new = self.act(cur_state.state, cur_state.mask, step)
+        if cur_state.mask is None or np.sum(cur_state.mask) > 0:
+            action_new = self.act(cur_state.state, step, cur_state.mask)
             q_next = self.Q[cur_state.state, action_new]
         else:
             q_next = 0
@@ -68,6 +70,9 @@ class Sarsa(TDMethod):
 
 
 class QLearning(TDMethod):
+    def get_name(self) -> str:
+        return "QLearning"
+
     def update(self, episode, step):
         if len(episode) <= 1:
             return
@@ -75,8 +80,9 @@ class QLearning(TDMethod):
         # prev_state = episode[len(episode) - 2]
         cur_state = episode[len(episode) - 2]
         next_state = episode[len(episode) - 1]
+        allowed_actions = self.get_allowed_actions(cur_state.mask)
         next_q = max(
-            [self.Q[next_state.state, a_] for a_ in range(len(cur_state.mask))],
+            [self.Q[next_state.state, a_] for a_ in allowed_actions],
             default=0,
         )  # TODO: maks # tood: right mask index?
         self.Q[cur_state.state, cur_state.action] = self.Q[
@@ -92,19 +98,22 @@ class QLearning(TDMethod):
 
 
 class ExpectedSarsa(TDMethod):
+    def get_name(self) -> str:
+        return "ExpectedSarsa"
+
     def _get_action_prob(self, observation_new, a) -> float:
         return (
             self.Q[observation_new, a]
             / sum(
                 [
                     self.Q[observation_new, a_]
-                    for a_ in range(self.env.env.action_space.n)
+                    for a_ in range(self.env.get_action_space_len())
                 ]
             )
             if sum(
                 [
                     self.Q[observation_new, a_]
-                    for a_ in range(self.env.env.action_space.n)
+                    for a_ in range(self.env.get_action_space_len())
                 ]
             )
             else 1
@@ -121,7 +130,7 @@ class ExpectedSarsa(TDMethod):
             prev_state.reward - self.Q[prev_state.state, prev_state.action]
         )
 
-        for a in range(self.env.env.action_space.n):
+        for a in range(self.env.get_action_space_len()):
             updated_q_value += (
                 ALPHA
                 * self._get_action_prob(cur_state.state, a)
@@ -135,6 +144,9 @@ class ExpectedSarsa(TDMethod):
 
 
 class DoubleQ(TDMethod):
+    def get_name(self) -> str:
+        return "DoubleQ"
+
     def __init__(self, env):
         super().__init__(env)
         self.Q_2 = defaultdict(float)
@@ -146,6 +158,7 @@ class DoubleQ(TDMethod):
         cur_state = episode[len(episode) - 2]
         next_state = episode[len(episode) - 1]
 
+        # TODO: allowed actions
         if random.randint(0, 100) < 50:
             max_q = max(
                 [self.Q[next_state.state, a_] for a_ in range(len(cur_state.mask))],

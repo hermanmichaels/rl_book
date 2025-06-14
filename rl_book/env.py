@@ -91,19 +91,22 @@ class GridWorldEnv(ParametrizedEnv):
 
 
 class MultiPlayerEnv(ParametrizedEnv):
-    """Wrapper around multi-player game envs."""
+    """Wrapper around multi-player game envs.
+    Atm only 2-player games are supported."""
 
     def __init__(
         self, env: Env, gamma: float, players: list[str]
     ) -> None:  # TODO: wrong env
-        super().__init__(env, gamma)
+        super().__init__(env, gamma, True)
+        if not len(players) == 2:
+            raise ValueError(f"Expected two players, but got {players}")
         self.players = players
 
     def get_action_space_len(self) -> int:
         return self.env.action_space(self.players[0]).n
 
     def get_observation_space_len(self) -> int:
-        return self.env.observation_space(self.players[0]).n
+        raise NotImplementedError
 
 
 class TicTacToeEnv(MultiPlayerEnv):
@@ -111,6 +114,9 @@ class TicTacToeEnv(MultiPlayerEnv):
 
     def __init__(self, env: Env, gamma=0.95):
         super().__init__(env, gamma, ["player_1", "player_2"])
+
+    def get_observation_space_len(self):
+        return 3 ** (6 * 7 * 3 * 2)  # TODO?
 
     def obs_to_state(self, obs, start_pos=None):
         board = obs  # shape: (3, 3, 2)
@@ -166,27 +172,3 @@ class ConnectFourEnv(MultiPlayerEnv):
             state += val * (3**i)
 
         return state
-
-
-class MethodStats:
-    def __init__(self, method):
-        self.method = method
-        self.wins = 0
-        self.picks = 0
-
-    def update_pick(self):
-        self.picks += 1
-
-    def update_win(
-        self,
-    ):
-        self.wins += 1
-
-    def get_win_ratio(self):
-        return self.wins / (self.picks + 1)
-
-    def clone(self):
-        cloned = MethodStats(self.method.clone())
-        cloned.wins = self.wins
-        cloned.picks = self.picks
-        return cloned

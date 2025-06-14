@@ -2,12 +2,14 @@ import argparse
 
 import gymnasium as gym
 
-from rl_book.env import ParametrizedEnv
+from rl_book.env import GridWorldEnv
 from rl_book.methods.dp import policy_iteration, value_iteration
+from rl_book.methods.inference import test_single_player
 from rl_book.methods.mc import OffPolicyMC, OffPolicyMCNonInc, OnPolicyMC
-from rl_book.methods.planning import DynaQ
+# from rl_book.methods.planning import DynaQ
 from rl_book.methods.td import DoubleQ, ExpectedSarsa, QLearning, Sarsa
 from rl_book.methods.td_n import SarsaN, TreeN
+from rl_book.methods.training import train_single_player
 
 GAMMA = 0.97
 EPS = 0.001
@@ -26,15 +28,15 @@ def solve_grid_world(method_name: str) -> None:
         map_name="4x4",
         is_slippery=False,
     )
-    env_train = ParametrizedEnv(
+    env_train = GridWorldEnv(
         gym_env_train, GAMMA, intermediate_rewards=True, eps_decay=True
     )
 
     # Find policy
     if method_name == "policy_iteration":
-        pi = policy_iteration(env_train)[1]
+        method = policy_iteration(env_train, 100)
     elif method_name == "value_iteration":
-        pi = value_iteration(env_train)[1]
+        method = value_iteration(env_train, 100)
     else:
         if method_name == "on_policy_mc":
             method = OnPolicyMC(env_train)
@@ -59,9 +61,7 @@ def solve_grid_world(method_name: str) -> None:
         else:
             raise ValueError(f"Unknown solution method {method_name}")
 
-        pi = train(env_train, method)[1]
-
-    gym_env_train.close()
+        train_single_player(env_train, method)[1]
 
     gym_env_test = gym.make(
         "FrozenLake-v1",
@@ -72,14 +72,7 @@ def solve_grid_world(method_name: str) -> None:
     )
 
     # Test policy and visualize found solution
-    observation, _ = gym_env_test.reset()
-
-    for _ in range(NUM_STEPS):
-        action = pi[observation]
-        observation, _, terminated, truncated, _ = gym_env_test.step(action)
-        if terminated or truncated:
-            break
-    gym_env_test.close()
+    test_single_player(gym_env_test, method)
 
 
 if __name__ == "__main__":

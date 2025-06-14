@@ -3,7 +3,7 @@ from collections import defaultdict
 
 import numpy as np
 
-from rl_book.methods.method import Algorithm
+from rl_book.methods.method import RLMethod
 
 EPS = 1e-1
 
@@ -22,27 +22,27 @@ def get_eps_greedy_policy(Q, step):
     return b
 
 
-class MCMethod(Algorithm):
+class MCMethod(RLMethod):
     def __init__(self, env):
         super().__init__(env)
         self.Q = defaultdict(float)
         # TODO: misused
-        self.pi = (
-            np.ones(
-                (self.env.get_observation_space_len(), self.env.get_action_space_len())
-            ).astype(np.int32)
-            / self.env.get_action_space_len()
-        )
+        self.pi = defaultdict(float)  # TOOD: was 1/n
 
     def clone(self):
         cloned = super().clone()
         cloned.Q = copy.deepcopy(self.Q)
         return cloned
 
-    def act(self, state, mask, step):
-        # TOOD: optional?
-        actions = range(self.env.get_action_space_len())
-        return np.random.choice(actions, p=self.pi[state])
+    def act(self, state, step, mask=None):
+        actions = self.get_allowed_actions(mask)
+        probs = [self.pi[state, a] for a in actions]
+        if sum(probs) == 0:
+            probs = [1.0 / len(probs) for _ in range(len(probs))]
+        probs = [x / sum(probs) for x in probs]  # TODO: order of executioN?
+        # import ipdb
+        # ipdb.set_trace()
+        return np.random.choice(actions, p=probs)
 
     # TODO: eps greedy
     def get_policy(self):
@@ -61,6 +61,9 @@ class OnPolicyMC(MCMethod):
         super().__init__(env)
         self.counts = defaultdict(int)
 
+    def get_name(self) -> str:
+        return "OnPolicyMc"
+
     def finalize(self, episode, step):
         G = 0.0
         for t in range(len(episode) - 2, -1, -1):
@@ -76,18 +79,18 @@ class OnPolicyMC(MCMethod):
 
                 if not all(
                     self.Q[s, a] == self.Q[s, 0]
-                    for a in range(self.env.env.action_space.n)
+                    for a in range(self.env.get_action_space_len())
                 ):
                     A_star = np.argmax(
-                        [self.Q[s, a] for a in range(self.env.env.action_space.n)]
+                        [self.Q[s, a] for a in range(self.env.get_action_space_len())]
                     )
-                    for a in range(self.env.env.action_space.n):
+                    for a in range(self.env.get_action_space_len()):
                         self.pi[s, a] = (
                             1
                             - self.env.eps(step)
-                            + self.env.eps(step) / self.env.env.action_space.n
+                            + self.env.eps(step) / self.env.get_action_space_len()
                             if a == A_star
-                            else self.env.eps(step) / self.env.env.action_space.n
+                            else self.env.eps(step) / self.env.get_action_space_len()
                         )
 
 
@@ -96,33 +99,37 @@ class OffPolicyMC(MCMethod):
         super().__init__(env)
         self.C = defaultdict(int)
 
-    def get_greedy_policy(self):
-        return np.argmax(
-            np.asarray(
-                [
-                    [self.Q[s, a] for a in range(self.env.env.action_space.n)]
-                    for s in range(self.env.env.observation_space.n)
-                ]
-            ),
-            1,
-        )
+    def get_name(self) -> str:
+        return "OffPolicyMC"
 
-    def get_eps_greedy_policy(self, step):
-        # TODO: speedup
-        Q = np.asarray(
-            [
-                [self.Q[state, a] for a in range(self.env.env.action_space.n)]
-                for state in range(self.env.env.observation_space.n)
-            ]
-        )
-        pi = np.zeros_like(Q) + self.env.eps(step) / self.env.env.action_space.n
-        optimal_actions = np.argmax(Q, 1)
-        pi[np.arange(Q.shape[0]), optimal_actions] += 1 - self.env.eps(step)
-        return pi
+    # def get_greedy_policy(self):
+    #     return np.argmax(
+    #         np.asarray(
+    #             [
+    #                 [self.Q[s, a] for a in range(self.env.get_action_space_len())]
+    #                 for s in range(self.env.get_observation_space_len())
+    #             ]
+    #         ),
+    #         1,
+    #     )
+
+    # def get_eps_greedy_policy(self, step):
+    #     # TODO: speedup
+    #     Q = np.asarray(
+    #         [
+    #             [self.Q[state, a] for a in range(self.env.env.action_space.n)]
+    #             for state in range(self.env.env.observation_space.n)
+    #         ]
+    #     )
+    #     pi = np.zeros_like(Q) + self.env.eps(step) / self.env.env.action_space.n
+    #     optimal_actions = np.argmax(Q, 1)
+    #     pi[np.arange(Q.shape[0]), optimal_actions] += 1 - self.env.eps(step)
+    #     return pi
 
     def finalize(self, episode, step):
-        # TODO: "randomly" can reuse act because eps-greedy policy, but could be any other
-        pi_target = self.get_greedy_policy()
+        # TODO: "randomly" can reuse act because eps-greedy policy, but
+        # could be any other
+        # pi_target = self.get_greedy_policy()
 
         # import ipdb
         # ipdb.set_trace()
@@ -136,12 +143,13 @@ class OffPolicyMC(MCMethod):
             G = self.env.gamma * G + r
             self.C[s, a] += W
             self.Q[s, a] += W / self.C[s, a] * (G - self.Q[s, a])
-            pi_target = self.get_greedy_policy()
-            if a != pi_target[s]:
+            if a != np.argmax(
+                self.Q[s, a_] for a_ in range(self.env.get_action_space_len())
+            ):
                 break
-            W *= 1 / self.pi[s, a]
+            W *= 1 / (self.Q[s, a] + 0.001)  # TODO: was pi - why +?
 
-        self.pi = self.get_eps_greedy_policy(step)
+        self.pi = self.Q  # TODO self.get_eps_greedy_policy(step)
 
         # TODO: return pi_target eventually
 

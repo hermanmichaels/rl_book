@@ -20,6 +20,9 @@ class SarsaN(TDMethod):
         super().__init__(env)
         self.n = n
 
+    def get_name(self) -> str:
+        return "SarsaN"
+
     def finalize(self, replay_buffer, step):
         for tau in range(len(replay_buffer) - self.n - 1, len(replay_buffer)):
             self.update(replay_buffer, step, tau)
@@ -74,6 +77,9 @@ class TreeN(TDMethod):
         super().__init__(env)
         self.n = n
 
+    def get_name(self) -> str:
+        return "TreeN"
+
     def finalize(self, replay_buffer, step):
         for tau in range(len(replay_buffer) - self.n - 1, len(replay_buffer)):
             self.update(replay_buffer, step, tau)
@@ -113,13 +119,15 @@ class TreeN(TDMethod):
                                     sum(
                                         [
                                             self.Q[replay_buffer[k].state, a]
-                                            for a in range(self.env.env.action_space.n)
+                                            for a in range(
+                                                self.env.get_action_space_len()
+                                            )
                                         ]
                                     )
                                     + 0.001
                                 )
                                 * self.Q[replay_buffer[k].state, a]
-                                for a in range(self.env.env.action_space.n)
+                                for a in range(self.env.get_action_space_len())
                                 if a != replay_buffer[k].action
                             ]
                         )
@@ -129,7 +137,7 @@ class TreeN(TDMethod):
                             sum(
                                 [
                                     self.Q[replay_buffer[k].state, a]
-                                    for a in range(self.env.env.action_space.n)
+                                    for a in range(self.env.get_action_space_len())
                                 ]
                             )
                             + 0.001
