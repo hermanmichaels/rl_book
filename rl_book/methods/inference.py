@@ -2,6 +2,8 @@ NUM_STEPS = 1000
 
 
 def test_single_player(env, method):
+    method.eval()
+
     # Test policy and visualize found solution
     observation, _ = env.reset()
 

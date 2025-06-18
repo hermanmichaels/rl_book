@@ -11,6 +11,7 @@ class RLMethod(ABC):
 
     def __init__(self, env: Env) -> None:
         self.env = env
+        self._train = True
 
     def get_name() -> str:
         """Returns the method's name.
@@ -75,8 +76,14 @@ class RLMethod(ABC):
         return (
             np.nonzero(mask)[0].tolist()
             if mask is not None
-            else [1 for _ in range(self.env.get_action_space_len())]
+            else [a for a in range(self.env.get_action_space_len())]
         )
+
+    def train(self):
+        self._train = True
+
+    def eval(self):
+        self._train = False
 
 
 class MethodWithStats:

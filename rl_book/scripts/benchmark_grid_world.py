@@ -10,6 +10,7 @@ from gymnasium.envs.toy_text.frozen_lake import generate_random_map
 
 from rl_book.env import GridWorldEnv
 from rl_book.methods.mc import OffPolicyMC, OnPolicyMC
+from rl_book.methods.method import RLMethod
 from rl_book.methods.td import DoubleQ, ExpectedSarsa, QLearning, Sarsa
 from rl_book.methods.td_n import SarsaN, TreeN
 from rl_book.methods.training import train_single_player
@@ -41,7 +42,7 @@ def get_check_frequency(step: int) -> int:
         return 10000
 
 
-def success_callback(pi: np.ndarray, step: int, env: Env) -> bool:
+def success_callback(method: RLMethod, step: int, env: Env) -> bool:
     """Tests whether the given policy can successfully solve the given Gridworld
     environment.
 
@@ -57,13 +58,17 @@ def success_callback(pi: np.ndarray, step: int, env: Env) -> bool:
     if step % get_check_frequency(step) != 0:
         return False
 
+    method.eval()
+
     observation, _ = env.reset()
     for _ in range(MAX_INFERENCE_STEPS):
-        action = pi[observation]
+        action = method.act(observation, step)
         observation, reward, terminated, truncated, _ = env.step(action)
         if terminated or truncated:
             break
     env.close()
+
+    method.train()
 
     return reward == 1
 
@@ -94,8 +99,8 @@ def plot_results(
 
 def benchmark(
     methods: list,
-    min_grid_size=3,
-    max_grid_size=6,
+    min_grid_size=5,
+    max_grid_size=15,
     extra_rewards: bool = True,
     eps_decay: bool = True,
     fig_path: str = "result.png",
@@ -132,7 +137,7 @@ def benchmark(
                         if not steps_needed_cur
                         else max(1, min(steps_needed_cur))
                     )
-                    success, _, step = train_single_player(env, method, max_s, callback)
+                    success, step = train_single_player(env, method, max_s, callback)
                     if success:
                         steps_needed_cur.append(step)
                 if steps_needed_cur:
@@ -151,12 +156,11 @@ def benchmark(
 
 
 if __name__ == "__main__":
-    env = generate_random_env(3, True, True)
-    benchmark(
-        [OnPolicyMC, OffPolicyMC],
-        fig_path="results/mc.png",
-    )
-    benchmark([Sarsa, QLearning, ExpectedSarsa, DoubleQ], fig_path="results/td.png")
+    # benchmark(
+    #     [OnPolicyMC, OffPolicyMC],
+    #     fig_path="results/mc.png",
+    # )
+    # benchmark([Sarsa, QLearning, ExpectedSarsa, DoubleQ], fig_path="results/td.png")
     benchmark([SarsaN, TreeN], fig_path="results/td_n_.png")
     # benchmark(
     #     [dyna_q, prioritized_sweeping],

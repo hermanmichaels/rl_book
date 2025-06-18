@@ -2,58 +2,33 @@ import copy
 from collections import defaultdict
 
 import numpy as np
+from gymnasium.core import Env
 
 from rl_book.methods.method import RLMethod
-
-EPS = 1e-1
-
-
-def get_eps_greedy_policy(Q, step):
-    # env
-    QQ = np.zeros((16, 4))
-    for i in range(16):
-        for j in range(4):
-            QQ[i, j] = Q[i, j]
-    b = np.zeros_like(QQ) + 0.05 / 4
-    optimal_actions = np.argmax(QQ, 1)
-    b[np.arange(QQ.shape[0]), optimal_actions] = (
-        b[np.arange(QQ.shape[0]), optimal_actions] + 1 - 0.05
-    )
-    return b
+from rl_book.replay_utils import ReplayItem
 
 
 class MCMethod(RLMethod):
-    def __init__(self, env):
+    def __init__(self, env: Env) -> None:
         super().__init__(env)
         self.Q = defaultdict(float)
-        # TODO: misused
-        self.pi = defaultdict(float)  # TOOD: was 1/n
+        self.pi = defaultdict(lambda: 1.0)
 
     def clone(self):
         cloned = super().clone()
         cloned.Q = copy.deepcopy(self.Q)
         return cloned
 
-    def act(self, state, step, mask=None):
+    def act(self, state: int, step: int, mask: list[int] | None = None) -> int:
         actions = self.get_allowed_actions(mask)
         probs = [self.pi[state, a] for a in actions]
-        if sum(probs) == 0:
-            probs = [1.0 / len(probs) for _ in range(len(probs))]
-        probs = [x / sum(probs) for x in probs]  # TODO: order of executioN?
-        # import ipdb
-        # ipdb.set_trace()
-        return np.random.choice(actions, p=probs)
 
-    # TODO: eps greedy
-    def get_policy(self):
-        return np.array(
-            [
-                np.argmax(
-                    [self.Q[s, a] for a in range(self.env.get_action_space_len())]
-                )
-                for s in range(self.env.get_observation_space_len())
-            ]
-        )
+        if self._train:
+            probs = np.exp(probs - np.max(probs))
+            probs /= sum(probs)
+            return np.random.choice(actions, p=probs)
+        else:
+            return actions[np.argmax(probs)]
 
 
 class OnPolicyMC(MCMethod):
@@ -64,7 +39,7 @@ class OnPolicyMC(MCMethod):
     def get_name(self) -> str:
         return "OnPolicyMc"
 
-    def finalize(self, episode, step):
+    def finalize(self, episode: list[ReplayItem], step: int) -> None:
         G = 0.0
         for t in range(len(episode) - 2, -1, -1):
             s = episode[t].state
@@ -102,38 +77,21 @@ class OffPolicyMC(MCMethod):
     def get_name(self) -> str:
         return "OffPolicyMC"
 
-    # def get_greedy_policy(self):
-    #     return np.argmax(
-    #         np.asarray(
-    #             [
-    #                 [self.Q[s, a] for a in range(self.env.get_action_space_len())]
-    #                 for s in range(self.env.get_observation_space_len())
-    #             ]
-    #         ),
-    #         1,
-    #     )
+    def get_eps_greedy_policy(self, step):
+        n_actions = self.env.get_action_space_len()
+        eps = self.env.eps(step)
 
-    # def get_eps_greedy_policy(self, step):
-    #     # TODO: speedup
-    #     Q = np.asarray(
-    #         [
-    #             [self.Q[state, a] for a in range(self.env.env.action_space.n)]
-    #             for state in range(self.env.env.observation_space.n)
-    #         ]
-    #     )
-    #     pi = np.zeros_like(Q) + self.env.eps(step) / self.env.env.action_space.n
-    #     optimal_actions = np.argmax(Q, 1)
-    #     pi[np.arange(Q.shape[0]), optimal_actions] += 1 - self.env.eps(step)
-    #     return pi
+        for s in range(self.env.env.observation_space.n):
+            # Build a NumPy array of Q-values for this state
+            qs = np.array([self.Q[s, a] for a in range(n_actions)])
+            best_action = np.argmax(qs)
+
+            for a in range(n_actions):
+                self.pi[s, a] = 1 - eps if a == best_action else eps
 
     def finalize(self, episode, step):
-        # TODO: "randomly" can reuse act because eps-greedy policy, but
-        # could be any other
-        # pi_target = self.get_greedy_policy()
-
-        # import ipdb
-        # ipdb.set_trace()
-
+        # Note: self.pi is here used as the behavior policy b, while the target policy π
+        # is implicity represented by argmax(Q).
         G = 0.0
         W = 1
         for t in range(len(episode) - 2, -1, -1):
@@ -143,71 +101,14 @@ class OffPolicyMC(MCMethod):
             G = self.env.gamma * G + r
             self.C[s, a] += W
             self.Q[s, a] += W / self.C[s, a] * (G - self.Q[s, a])
-            if a != np.argmax(
-                self.Q[s, a_] for a_ in range(self.env.get_action_space_len())
-            ):
+            follow = [self.Q[s, a_] for a_ in range(self.env.get_action_space_len())]
+            # if any([x != follow[0] for x in follow]) and a != np.argmax(
+            #     follow
+            # ):
+            if a != np.argmax(follow):
                 break
-            W *= 1 / (self.Q[s, a] + 0.001)  # TODO: was pi - why +?
+            W *= 1 / (self.pi[s, a])
 
-        self.pi = self.Q  # TODO self.get_eps_greedy_policy(step)
-
-        # TODO: return pi_target eventually
-
-
-class OffPolicyMCNonInc(MCMethod):
-    def __init__(self, env):
-        super().__init__(env)
-        self.returns = defaultdict(list)
-        self.ratios = defaultdict(list)
-
-    def get_eps_greedy_policy(self, step):
-        # TODO: speedup
-        Q = np.asarray(
-            [
-                [self.Q[state, a] for a in range(self.env.env.action_space.n)]
-                for state in range(self.env.env.observation_space.n)
-            ]
-        )
-        pi = np.zeros_like(Q) + self.env.eps(step) / self.env.env.action_space.n
-        optimal_actions = np.argmax(Q, 1)
-        pi[np.arange(Q.shape[0]), optimal_actions] += 1 - self.env.eps(step)
-        return pi
-
-    def finalize(self, episode, step):
-        G = 0.0
-        ratio = 1
-
-        # Create current target policy,
-        # which is the argmax of the Q function,
-        # but gives equal weighting to tied Q values.
-        Q = np.asarray(
-            [
-                [self.Q[state, a] for a in range(self.env.env.action_space.n)]
-                for state in range(self.env.env.observation_space.n)
-            ]
-        )
-        pi = np.zeros_like(Q)
-        optimal_actions = np.argmax(Q, 1)
-        pi[np.arange(Q.shape[0]), optimal_actions] = 1
-        uniform_rows = np.all(Q == Q[:, [0]], axis=1)
-        pi[uniform_rows] = 1 / self.env.env.action_space.n
-
-        for t in range(len(episode) - 2, -1, -1):
-            s = episode[t].state
-            a = episode[t].action
-            r = episode[t].reward
-            G = self.env.gamma * G + r
-
-            ratio *= pi[s, a] / self.pi[s, a]
-
-            if ratio == 0:
-                break
-
-            self.returns[s, a].append(G)
-            self.ratios[s, a].append(ratio)
-
-            self.Q[s, a] = sum(
-                [r * s for r, s in zip(self.returns[s, a], self.ratios[s, a])]
-            ) / sum([s for s in self.ratios[s, a]])
-
-        self.pi = self.get_eps_greedy_policy(step)
+        # Improve the behavior policy by any kind of greedy policy - in particular
+        # here we form an ε-greedy policy from Q.
+        self.get_eps_greedy_policy(step)

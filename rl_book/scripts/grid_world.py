@@ -5,7 +5,7 @@ import gymnasium as gym
 from rl_book.env import GridWorldEnv
 from rl_book.methods.dp import policy_iteration, value_iteration
 from rl_book.methods.inference import test_single_player
-from rl_book.methods.mc import OffPolicyMC, OffPolicyMCNonInc, OnPolicyMC
+from rl_book.methods.mc import OffPolicyMC, OnPolicyMC
 # from rl_book.methods.planning import DynaQ
 from rl_book.methods.td import DoubleQ, ExpectedSarsa, QLearning, Sarsa
 from rl_book.methods.td_n import SarsaN, TreeN
@@ -34,16 +34,14 @@ def solve_grid_world(method_name: str) -> None:
 
     # Find policy
     if method_name == "policy_iteration":
-        method = policy_iteration(env_train, 100)
+        method = policy_iteration(env_train)
     elif method_name == "value_iteration":
-        method = value_iteration(env_train, 100)
+        method = value_iteration(env_train)
     else:
         if method_name == "on_policy_mc":
             method = OnPolicyMC(env_train)
         elif method_name == "off_policy_mc":
             method = OffPolicyMC(env_train)
-        elif method_name == "off_policy_mc_non_inc":
-            method = OffPolicyMCNonInc(env_train)
         elif method_name == "sarsa":
             method = Sarsa(env_train)
         elif method_name == "q":
@@ -61,7 +59,7 @@ def solve_grid_world(method_name: str) -> None:
         else:
             raise ValueError(f"Unknown solution method {method_name}")
 
-        train_single_player(env_train, method)[1]
+        train_single_player(env_train, method, 10000)
 
     gym_env_test = gym.make(
         "FrozenLake-v1",

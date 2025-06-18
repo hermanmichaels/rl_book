@@ -1,11 +1,12 @@
 import numpy as np
+from gymnasium.core import Env
 
 from rl_book.env import ParametrizedEnv
 from rl_book.methods.method import RLMethod
 
 EPS = 0.05
 
-
+# TODO: share?
 def extract_policy(
     V: np.ndarray,
     observation_space_len: int,
@@ -40,18 +41,15 @@ def extract_policy(
 
 
 class DPMethod(RLMethod):
-    def __init__(self, env, pi):
+    def __init__(self, env: Env, pi: np.ndarray) -> None:
         super().__init__(env)
         self.pi = pi
 
-    def act(self, state, step, mask=None):
+    def act(self, state: int, step: int, mask: list[int] | None = None) -> int:
         return self.pi[state]
 
 
-# TODO: bring back old version with eps
-def policy_iteration(
-    env: ParametrizedEnv, max_steps: int
-) -> tuple[bool, np.ndarray, int]:
+def policy_iteration(env: ParametrizedEnv) -> DPMethod:
     """Uses 'Policy Iteration' to solve the RL problem
     specified by the passed Gymnasium env.
 
@@ -59,9 +57,9 @@ def policy_iteration(
         env: env containing the problem
 
     Returns:
-        found policy
+        found method
     """
-    pi = np.zeros(env.get_observation_space_len()).astype(np.int32)
+    pi = np.zeros(env.get_observation_space_len()).astype(np.int32)  # TODO: needed?
 
     def _policy_evaluation() -> np.ndarray:
         """Run's policy evaluation - i.e. evaluates the current
@@ -83,10 +81,12 @@ def policy_iteration(
                 break
         return V
 
-    for step in range(max_steps):
+    while True:
         V = _policy_evaluation()
 
+        policy_stable = True
         for s in range(env.get_observation_space_len()):
+            old_a = pi[s]
             pi[s] = np.argmax(
                 [
                     p * (r + env.gamma * V[s_next])
@@ -94,17 +94,15 @@ def policy_iteration(
                     for p, s_next, r, _ in env.env.unwrapped.P[s][a]  # type: ignore
                 ]
             )
+            if old_a != pi[s]:
+                policy_stable = False
+                break
 
-        pi = extract_policy(
-            V, env.get_observation_space_len(), env.get_action_space_len(), env.env.unwrapped.P, env.gamma  # type: ignore
-        )
-
-    return DPMethod(env, pi)
+        if policy_stable:
+            return DPMethod(env, pi)
 
 
-def value_iteration(
-    env: ParametrizedEnv, max_steps: int
-) -> tuple[bool, np.ndarray, int]:
+def value_iteration(env: ParametrizedEnv) -> tuple[bool, np.ndarray, int]:
     """Uses 'Value Iteration' to solve the RL problem
     specified by the passed Gymnasium env.
 
@@ -116,7 +114,7 @@ def value_iteration(
     """
     V = np.zeros(env.get_observation_space_len())
 
-    for step in range(max_steps):
+    while True:
         delta = 0
         for s in range(env.get_observation_space_len()):
             v = V[s]
@@ -129,8 +127,11 @@ def value_iteration(
             )
             delta = max(delta, abs(v - V[s]))
 
-        pi = extract_policy(
-            V, env.get_observation_space_len(), env.get_action_space_len(), env.env.unwrapped.P, env.gamma  # type: ignore
-        )
+        if delta < EPS:
+            break
+
+    pi = extract_policy(
+        V, env.get_observation_space_len(), env.get_action_space_len(), env.env.unwrapped.P, env.gamma  # type: ignore
+    )
 
     return DPMethod(env, pi)

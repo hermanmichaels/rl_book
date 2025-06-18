@@ -29,6 +29,7 @@ def train_single_player(
         terminated = truncated = False
 
         episode = []
+        cur_episode_len = 0  # TODO: change depending on size!!!
 
         while not terminated and not truncated:
             action = method.act(observation, step)
@@ -42,16 +43,20 @@ def train_single_player(
 
             observation = observation_new
 
+            cur_episode_len += 1
+            if cur_episode_len > 100:
+                break
+
         episode.append(ReplayItem(observation_new, -1, reward, []))  # why? sarsa?
         method.finalize(episode, step)
 
-        if callback and callback(method.get_policy(), step):
-            return True, method.get_policy(), step
+        if callback and callback(method, step):
+            return True, step
 
     env.env.close()
 
     # TOOD: need to return policy?
-    return False, method.get_policy(), step
+    return False, step
 
 
 def train_multi_player(
