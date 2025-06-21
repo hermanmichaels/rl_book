@@ -11,6 +11,7 @@ from gymnasium.envs.toy_text.frozen_lake import generate_random_map
 from rl_book.env import GridWorldEnv
 from rl_book.methods.mc import OffPolicyMC, OnPolicyMC
 from rl_book.methods.method import RLMethod
+from rl_book.methods.planning import DynaQ
 from rl_book.methods.td import DoubleQ, ExpectedSarsa, QLearning, Sarsa
 from rl_book.methods.td_n import SarsaN, TreeN
 from rl_book.methods.training import train_single_player
@@ -161,8 +162,8 @@ if __name__ == "__main__":
     #     fig_path="results/mc.png",
     # )
     # benchmark([Sarsa, QLearning, ExpectedSarsa, DoubleQ], fig_path="results/td.png")
-    benchmark([SarsaN, TreeN], fig_path="results/td_n_.png")
-    # benchmark(
-    #     [dyna_q, prioritized_sweeping],
-    #     fig_path="results/planning.png",
-    # )
+    # benchmark([SarsaN, TreeN], fig_path="results/td_n.png")
+    benchmark(
+        [DynaQ],
+        fig_path="results/planning.png",
+    )

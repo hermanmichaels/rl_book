@@ -1,15 +1,17 @@
 import argparse
 
 import gymnasium as gym
+from gymnasium.envs.toy_text.frozen_lake import generate_random_map
 
 from rl_book.env import GridWorldEnv
 from rl_book.methods.dp import policy_iteration, value_iteration
 from rl_book.methods.inference import test_single_player
 from rl_book.methods.mc import OffPolicyMC, OnPolicyMC
-# from rl_book.methods.planning import DynaQ
+from rl_book.methods.planning import DynaQ
 from rl_book.methods.td import DoubleQ, ExpectedSarsa, QLearning, Sarsa
 from rl_book.methods.td_n import SarsaN, TreeN
 from rl_book.methods.training import train_single_player
+from rl_book.scripts.benchmark_grid_world import generate_random_env
 
 GAMMA = 0.97
 EPS = 0.001
@@ -22,10 +24,12 @@ def solve_grid_world(method_name: str) -> None:
     Args:
         method: solving method
     """
+    desc = generate_random_map(size=4)
+
     gym_env_train = gym.make(
         "FrozenLake-v1",
-        desc=None,
-        map_name="4x4",
+        desc=desc,
+        # map_name="4x4",
         is_slippery=False,
     )
     env_train = GridWorldEnv(
@@ -63,8 +67,8 @@ def solve_grid_world(method_name: str) -> None:
 
     gym_env_test = gym.make(
         "FrozenLake-v1",
-        desc=None,
-        map_name="4x4",
+        desc=desc,
+        # map_name="4x4",
         is_slippery=False,
         render_mode="human",
     )

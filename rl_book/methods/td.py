@@ -81,6 +81,7 @@ class QLearning(TDMethod):
             - self.Q[cur_state.state, cur_state.action]
         )
 
+    # TODO: needed?
     def finalize(self, episode: list[ReplayItem], step: int) -> None:
         self.update(episode, step)
 
@@ -116,10 +117,6 @@ class ExpectedSarsa(TDMethod):
         self.Q[cur_state.state, cur_state.action] = updated_q_value
 
     def finalize(self, episode: list[ReplayItem], step: int) -> None:
-        # print(len(episode))
-        # if len(episode) >= 100:
-        #     import ipdb
-        #     ipdb.set_trace()
         self.update(episode, step)
 
 
