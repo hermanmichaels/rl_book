@@ -127,6 +127,7 @@ def train_multi_player(
             env.env.step(action)
 
             _, reward, _, _, _ = env.env.last()
+            reward += 0.1
 
             if (
                 env.env.agent_selection == env.players[player_pos]

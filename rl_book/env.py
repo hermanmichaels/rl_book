@@ -205,3 +205,20 @@ class ConnectFourEnv(MultiPlayerEnv):
             state += val * (3**i)
 
         return state
+    
+    def get_game_result(self, reward: float) -> GameResult:
+        if reward == 1:
+            return GameResult.WIN
+        elif reward == 0:
+            return GameResult.DRAW
+        elif reward == -1:
+            return GameResult.LOSS
+        
+    def user_query(self) -> str:
+        return "Please indicate in which column in which to drop the next token (0 - 6):"
+    
+    # def step(self, action: int) -> tuple[int, float, bool, bool, dict]:
+    #     # TODO: include in env?
+    #     observation, reward, terminated, truncated, info = self.env.step(action)
+    #     reward += 0.1
+    #     return observation, reward, terminated, truncated, info

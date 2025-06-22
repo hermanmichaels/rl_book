@@ -41,7 +41,7 @@ def benchmark_multi_player(env_name: str) -> None:
     ]
     zoo = [MethodWithStats(Random(env))]
     # Train given methods
-    train_multi_player(env, methods, zoo, max_steps=100, plot_interval=100)
+    train_multi_player(env, methods, zoo, max_steps=100000, plot_interval=100)
 
     # Now give user chance to play against one of the methods
     # TOOD: need good wrapper from action to input
