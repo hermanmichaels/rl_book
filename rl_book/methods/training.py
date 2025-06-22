@@ -55,7 +55,6 @@ def train_single_player(
 
     env.env.close()
 
-    # TOOD: need to return policy?
     return False, step
 
 

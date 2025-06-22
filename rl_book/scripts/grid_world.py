@@ -11,7 +11,6 @@ from rl_book.methods.planning import DynaQ
 from rl_book.methods.td import DoubleQ, ExpectedSarsa, QLearning, Sarsa
 from rl_book.methods.td_n import SarsaN, TreeN
 from rl_book.methods.training import train_single_player
-from rl_book.scripts.benchmark_grid_world import generate_random_env
 
 GAMMA = 0.97
 EPS = 0.001

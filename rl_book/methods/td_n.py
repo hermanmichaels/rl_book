@@ -1,4 +1,3 @@
-import math
 from collections import defaultdict
 from dataclasses import dataclass
 
@@ -6,7 +5,6 @@ import numpy as np
 from gymnasium.core import Env
 
 from rl_book.methods.td import TDMethod
-from rl_book.utils import div_with_zero
 
 
 @dataclass
@@ -38,7 +36,8 @@ class SarsaN(TDMethod):
     ) -> None:
         is_final = True
         if tau is None:
-            # tau is set when finalizing the episode - otherwise pick the correct update step here.
+            # tau is set when finalizing the episode - otherwise pick
+            # the correct update step here.
             tau = len(episode) - self.n - 1
             is_final = False
 

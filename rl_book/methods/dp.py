@@ -6,6 +6,7 @@ from rl_book.methods.method import RLMethod
 
 EPS = 0.05
 
+
 # TODO: share?
 def extract_policy(
     V: np.ndarray,
@@ -131,7 +132,11 @@ def value_iteration(env: ParametrizedEnv) -> tuple[bool, np.ndarray, int]:
             break
 
     pi = extract_policy(
-        V, env.get_observation_space_len(), env.get_action_space_len(), env.env.unwrapped.P, env.gamma  # type: ignore
+        V,
+        env.get_observation_space_len(),
+        env.get_action_space_len(),
+        env.env.unwrapped.P,
+        env.gamma,  # type: ignore
     )
 
     return DPMethod(env, pi)

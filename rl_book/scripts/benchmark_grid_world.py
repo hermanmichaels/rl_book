@@ -4,7 +4,6 @@ from typing import Callable
 
 import gymnasium as gym
 import matplotlib.pyplot as plt
-import numpy as np
 from gymnasium.core import Env
 from gymnasium.envs.toy_text.frozen_lake import generate_random_map
 
@@ -157,12 +156,12 @@ def benchmark(
 
 
 if __name__ == "__main__":
-    # benchmark(
-    #     [OnPolicyMC, OffPolicyMC],
-    #     fig_path="results/mc.png",
-    # )
-    # benchmark([Sarsa, QLearning, ExpectedSarsa, DoubleQ], fig_path="results/td.png")
-    # benchmark([SarsaN, TreeN], fig_path="results/td_n.png")
+    benchmark(
+        [OnPolicyMC, OffPolicyMC],
+        fig_path="results/mc.png",
+    )
+    benchmark([Sarsa, QLearning, ExpectedSarsa, DoubleQ], fig_path="results/td.png")
+    benchmark([SarsaN, TreeN], fig_path="results/td_n.png")
     benchmark(
         [DynaQ],
         fig_path="results/planning.png",

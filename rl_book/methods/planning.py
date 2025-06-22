@@ -1,8 +1,7 @@
 import copy
-import heapq
 import random
 from collections import defaultdict
-from typing import Callable, Optional
+from typing import Optional
 
 import numpy as np
 from gymnasium.core import Env
@@ -10,7 +9,6 @@ from gymnasium.core import Env
 from rl_book.env import ParametrizedEnv
 from rl_book.methods.method import RLMethod
 from rl_book.replay_utils import ReplayItem
-from rl_book.utils import get_policy
 
 NUM_STEPS = 1000
 NUM_MCTS_ITERATIONS = 1000
