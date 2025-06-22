@@ -3,6 +3,7 @@ from abc import ABC
 import numpy as np
 from gymnasium.core import Env  # TODO: or any other env
 
+from rl_book.env import GameResult
 from rl_book.replay_utils import ReplayItem
 
 
@@ -13,7 +14,7 @@ class RLMethod(ABC):
         self.env = env
         self._train = True
 
-    def get_name() -> str:
+    def get_name(self) -> str:
         """Returns the method's name.
 
         Returns:
@@ -32,7 +33,7 @@ class RLMethod(ABC):
         Returns:
             selected action
         """
-        pass
+        return NotImplementedError
 
     def update(self, episode: list[ReplayItem], step: int) -> None:
         """Updates the method's parameters.
@@ -93,18 +94,31 @@ class MethodWithStats:
     def __init__(self, method: RLMethod) -> None:
         self.method = method
         self.wins = 0
+        self.draws = 0
+        self.losses = 0
         self.picks = 0
 
     def update_pick(self) -> None:
         self.picks += 1
 
-    def update_win(
-        self,
-    ) -> None:
-        self.wins += 1
+    def update_result(self, result: GameResult) -> None:
+        if result == GameResult.WIN:
+            self.wins += 1
+        elif result == GameResult.DRAW:
+            self.draws += 1
+        elif result == GameResult.LOSS:
+            self.losses += 1
+        else:
+            print(f"Unknown game result {result}")
 
     def get_win_ratio(self):
         return self.wins / (self.picks + 1)
+
+    def get_draw_ratio(self):
+        return self.draws / (self.picks + 1)
+
+    def get_loss_ratio(self):
+        return self.losses / (self.picks + 1)
 
     def clone(self):
         cloned = MethodWithStats(self.method.clone())

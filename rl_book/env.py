@@ -1,3 +1,5 @@
+from enum import Enum
+
 import numpy as np
 from gymnasium.core import Env  # TODO: or any other env
 from gymnasium.spaces import Discrete
@@ -90,6 +92,13 @@ class GridWorldEnv(ParametrizedEnv):
         return observation, reward, terminated, truncated, info
 
 
+class GameResult(Enum):
+    INVALID = 0
+    WIN = 1
+    DRAW = 2
+    LOSS = 3
+
+
 class MultiPlayerEnv(ParametrizedEnv):
     """Wrapper around multi-player game envs.
     Atm only 2-player games are supported."""
@@ -106,6 +115,9 @@ class MultiPlayerEnv(ParametrizedEnv):
         return self.env.action_space(self.players[0]).n
 
     def get_observation_space_len(self) -> int:
+        raise NotImplementedError
+
+    def get_game_result(self, reward) -> GameResult:
         raise NotImplementedError
 
 
@@ -139,6 +151,14 @@ class TicTacToeEnv(MultiPlayerEnv):
         for i, val in enumerate(state_flat):
             state += val * (3**i)
         return state
+
+    def get_game_result(self, reward: float) -> GameResult:
+        if reward == 1:
+            return GameResult.WIN
+        elif reward == 0:
+            return GameResult.DRAW
+        elif reward == -1:
+            return GameResult.LOSS
 
 
 class ConnectFourEnv(MultiPlayerEnv):

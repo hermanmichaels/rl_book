@@ -4,12 +4,13 @@ from collections import defaultdict
 import numpy as np
 from gymnasium.core import Env
 
+from rl_book.env import ParametrizedEnv
 from rl_book.methods.method import RLMethod
 from rl_book.replay_utils import ReplayItem
 
 
 class MCMethod(RLMethod):
-    def __init__(self, env: Env) -> None:
+    def __init__(self, env: ParametrizedEnv) -> None:
         super().__init__(env)
         self.Q = defaultdict(float)
         self.pi = defaultdict(lambda: 1.0)
@@ -45,6 +46,9 @@ class OnPolicyMC(MCMethod):
             s = episode[t].state
             a = episode[t].action
             r = episode[t].reward
+            mask = episode[t].mask
+
+            actions = self.get_allowed_actions(mask)
 
             G = self.env.gamma * G + r
             prev_s = [(item.state, item.action) for item in episode[:t]]
@@ -57,7 +61,10 @@ class OnPolicyMC(MCMethod):
                     for a in range(self.env.get_action_space_len())
                 ):
                     A_star = np.argmax(
-                        [self.Q[s, a] for a in range(self.env.get_action_space_len())]
+                        [
+                            self.Q[s, a] if a in actions else self.Q[s, a] - np.inf
+                            for a in range(self.env.get_action_space_len())
+                        ]
                     )
                     for a in range(self.env.get_action_space_len()):
                         self.pi[s, a] = (
@@ -80,8 +87,9 @@ class OffPolicyMC(MCMethod):
     def get_eps_greedy_policy(self, step):
         n_actions = self.env.get_action_space_len()
         eps = self.env.eps(step)
+        seen_states = {s for s, _ in self.Q.keys()}
 
-        for s in range(self.env.env.observation_space.n):
+        for s in seen_states:
             # Build a NumPy array of Q-values for this state
             qs = np.array([self.Q[s, a] for a in range(n_actions)])
             best_action = np.argmax(qs)
@@ -98,13 +106,17 @@ class OffPolicyMC(MCMethod):
             s = episode[t].state
             a = episode[t].action
             r = episode[t].reward
+            mask = episode[t].mask
+
+            actions = self.get_allowed_actions(mask)
+
             G = self.env.gamma * G + r
             self.C[s, a] += W
             self.Q[s, a] += W / self.C[s, a] * (G - self.Q[s, a])
-            follow = [self.Q[s, a_] for a_ in range(self.env.get_action_space_len())]
-            # if any([x != follow[0] for x in follow]) and a != np.argmax(
-            #     follow
-            # ):
+            follow = [
+                self.Q[s, a_] if a_ in actions else self.Q[s, a] - np.inf
+                for a_ in range(self.env.get_action_space_len())
+            ]  # todo: mask?
             if a != np.argmax(follow):
                 break
             W *= 1 / (self.pi[s, a])

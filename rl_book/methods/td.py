@@ -5,6 +5,7 @@ from collections import defaultdict
 import numpy as np
 from gymnasium.core import Env
 
+from rl_book.env import ParametrizedEnv
 from rl_book.methods.method import RLMethod
 from rl_book.replay_utils import ReplayItem
 
@@ -67,7 +68,7 @@ class QLearning(TDMethod):
         cur_state = episode[len(episode) - 2]
         next_state = episode[len(episode) - 1]
 
-        allowed_actions = self.get_allowed_actions(cur_state.mask)
+        allowed_actions = self.get_allowed_actions(cur_state.mask)  # todo: not mask?
         next_q = max(
             [self.Q[next_state.state, a_] for a_ in allowed_actions],
             default=0,
@@ -106,7 +107,9 @@ class ExpectedSarsa(TDMethod):
             cur_state.reward - self.Q[cur_state.state, cur_state.action]
         )
 
-        for a in range(self.env.get_action_space_len()):  # TOOD: mask
+        actions = self.get_allowed_actions(next_state.mask)  # todo: next state?
+
+        for a in actions:  # TOOD: mask
             updated_q_value += (
                 self.env.gamma
                 * ALPHA
@@ -124,7 +127,7 @@ class DoubleQ(TDMethod):
     def get_name(self) -> str:
         return "DoubleQ"
 
-    def __init__(self, env: Env) -> None:
+    def __init__(self, env: ParametrizedEnv) -> None:
         super().__init__(env)
         self.Q_2 = defaultdict(float)
 

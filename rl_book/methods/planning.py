@@ -4,7 +4,6 @@ from collections import defaultdict
 from typing import Optional
 
 import numpy as np
-from gymnasium.core import Env
 
 from rl_book.env import ParametrizedEnv
 from rl_book.methods.method import RLMethod
@@ -32,7 +31,7 @@ class ReplayBuffer:
 class DynaQ(RLMethod):
     def __init__(
         self,
-        env: Env,
+        env: ParametrizedEnv,
         n: int = 3,
         plus_mode: bool = False,
     ):
@@ -43,8 +42,11 @@ class DynaQ(RLMethod):
         self.model = defaultdict(lambda: (0, 0.0, 0))
         self.plus_mode = plus_mode
 
+    def get_name(self) -> str:  # todo: good style?
+        return "DynaQ"
+
     def clone(self):
-        cloned = self.__class__()  # TOOD: args
+        cloned = self.__class__(self.env)  # TOOD: args
         cloned.Q = copy.deepcopy(self.Q)
         return cloned
 

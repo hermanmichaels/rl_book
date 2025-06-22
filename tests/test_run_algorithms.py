@@ -22,7 +22,17 @@ def test_dp_grid_world(grid_world_env: GridWorldEnv, method: Callable):
 
 @pytest.mark.parametrize(
     "method_name",
-    [OnPolicyMC, OffPolicyMC, Sarsa, QLearning, ExpectedSarsa, DoubleQ, SarsaN, TreeN, DynaQ],
+    [
+        OnPolicyMC,
+        OffPolicyMC,
+        Sarsa,
+        QLearning,
+        ExpectedSarsa,
+        DoubleQ,
+        SarsaN,
+        TreeN,
+        DynaQ,
+    ],
 )
 def test_methods_grid_world(grid_world_env: GridWorldEnv, method_name: Callable):
     method = method_name(grid_world_env)
@@ -32,11 +42,9 @@ def test_methods_grid_world(grid_world_env: GridWorldEnv, method_name: Callable)
 # , OffPolicyMC, OffPolicyMCNonInc, Sarsa, QLearning, ExpectedSarsa, SarsaN, TreeN
 @pytest.mark.parametrize("method_name", [OnPolicyMC])
 def test_methods_tic_tac_toe(tic_tac_toe_env: TicTacToeEnv, method_name: Callable):
-    num_states = tic_tac_toe_env.get_observation_space_len()
     zoo = [MethodWithStats(Random(tic_tac_toe_env))]
     methods = [MethodWithStats(method_name(tic_tac_toe_env))]
     train_multi_player(tic_tac_toe_env, methods, zoo, max_steps=100)
-    # assert pi.shape == (num_states)
 
 
 # def test_mcts(env_train: ParametrizedEnv):

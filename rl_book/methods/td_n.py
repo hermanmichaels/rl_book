@@ -2,8 +2,8 @@ from collections import defaultdict
 from dataclasses import dataclass
 
 import numpy as np
-from gymnasium.core import Env
 
+from rl_book.env import ParametrizedEnv
 from rl_book.methods.td import TDMethod
 
 
@@ -18,7 +18,7 @@ ALPHA = 0.1
 
 
 class SarsaN(TDMethod):
-    def __init__(self, env: Env, n: int = 3) -> None:
+    def __init__(self, env: ParametrizedEnv, n: int = 3) -> None:
         super().__init__(env)
         self.n = n
 

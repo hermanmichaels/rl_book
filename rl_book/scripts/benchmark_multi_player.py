@@ -7,6 +7,7 @@ from rl_book.methods.inference import test_again_user
 from rl_book.methods.mc import OffPolicyMC, OnPolicyMC
 from rl_book.methods.method import MethodWithStats
 from rl_book.methods.misc import Random
+from rl_book.methods.planning import DynaQ
 from rl_book.methods.td import DoubleQ, ExpectedSarsa, QLearning, Sarsa
 from rl_book.methods.td_n import SarsaN, TreeN
 from rl_book.methods.training import train_multi_player
@@ -36,6 +37,7 @@ def benchmark_multi_player(env_name: str) -> None:
         MethodWithStats(DoubleQ(env)),
         MethodWithStats(SarsaN(env)),
         MethodWithStats(TreeN(env)),
+        MethodWithStats(DynaQ(env)),
     ]
     zoo = [MethodWithStats(Random(env))]
     # Train given methods

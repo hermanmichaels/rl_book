@@ -4,14 +4,17 @@ from typing import Callable
 
 import matplotlib.pyplot as plt
 import numpy as np
-from gymnasium.core import Env
-
+from rl_book.env import MultiPlayerEnv, ParametrizedEnv
 from rl_book.methods.method import MethodWithStats, RLMethod
+from rl_book.pretty_print import log_methods
 from rl_book.replay_utils import ReplayItem
 
 
 def train_single_player(
-    env: Env, method: RLMethod, max_steps: int = 100, callback: Callable | None = None
+    env: ParametrizedEnv,
+    method: RLMethod,
+    max_steps: int = 100,
+    callback: Callable | None = None,
 ) -> tuple[bool, np.ndarray, int]:
     """Trains a method on single-player environments.
 
@@ -43,6 +46,7 @@ def train_single_player(
 
             observation = observation_new
 
+            # TODO: dangerous!
             cur_episode_len += 1
             if cur_episode_len > 100:
                 break
@@ -59,9 +63,9 @@ def train_single_player(
 
 
 def train_multi_player(
-    env: Env,
+    env: MultiPlayerEnv,
     methods: list[MethodWithStats],
-    zoo: list[RLMethod],
+    zoo: list[MethodWithStats],
     max_steps: int = 100,
     zoo_update_interval: int = 50,
     zoo_size: int = 50,
@@ -98,20 +102,19 @@ def train_multi_player(
 
         while not done:
             agent = env.env.agent_selection
-            observation, reward, termination, truncation, info = env.env.last()
-            reward += 0.1  # todo
+            observation, reward, termination, truncation, _ = env.env.last()
 
             done = termination or truncation
 
             if done:
                 action = None
-
-                # Game over, rewards contains all
-                if env.env.rewards[env.players[player_pos]] == 1:
-                    methods[method_idx].update_win()
-                elif env.env.rewards[env.players[1 - player_pos]] == 1:
-                    zoo[opponent_idx].update_win()
-
+                # Game over, rewards contains all playerss
+                methods[method_idx].update_result(
+                    env.get_game_result(env.env.rewards[env.players[player_pos]])
+                )
+                zoo[opponent_idx].update_result(
+                    env.get_game_result(env.env.rewards[env.players[1 - player_pos]])
+                )
             else:
                 mask = observation["action_mask"]
                 state = env.obs_to_state(observation["observation"], player_pos)
@@ -132,20 +135,17 @@ def train_multi_player(
                 s, a, mask = state_dict[env.players[player_pos]]
 
                 observation_new = env.env.observe(env.players[player_pos])
-                mask_new = observation_new["action_mask"]
 
                 episode.append(ReplayItem(s, a, reward, mask))
-
-                if reward == 0:
-                    legal = []
-                else:
-                    legal = observation_new["action_mask"]
 
                 methods[method_idx].method.update(episode, step)
 
         episode.append(
             ReplayItem(
-                env.obs_to_state(observation_new["observation"], player_pos), -1, 0, []
+                env.obs_to_state(observation_new["observation"], player_pos),
+                -1,
+                0,
+                [],  # TODO: needed?
             )
         )
 
@@ -163,6 +163,8 @@ def train_multi_player(
 
             plt.legend()
             plt.savefig("wins.png")
+
+            log_methods(methods, step)
 
         if step % zoo_update_interval == 0:
             zoo.append(methods[method_idx].clone())
