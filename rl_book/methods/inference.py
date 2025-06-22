@@ -15,11 +15,11 @@ def test_single_player(env, method):
     env.close()
 
 
-def test_again_user(env, method):
+def test_against_user(env, method):
     env.env.reset()
 
     for agent in env.env.agent_iter():
-        observation, reward, termination, truncation, info = env.env.last()
+        observation, _, termination, truncation, info = env.env.last()
 
         if termination or truncation:
             action = None
@@ -28,10 +28,10 @@ def test_again_user(env, method):
 
             state = env.obs_to_state(observation["observation"], 0)
             if agent == "player_1":
-                action = method.method.act(state, 1000, mask)
+                action = method.act(state, 1000, mask)
             else:
                 # action = methods[0].method.act(state, mask)
-                action = int(input("Enter your action (column index): "))
+                action = int(input(env.user_query()))
 
         env.env.step(action)
 

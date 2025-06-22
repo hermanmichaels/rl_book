@@ -3,7 +3,7 @@ import argparse
 from pettingzoo.classic import connect_four_v3, tictactoe_v3
 
 from rl_book.env import ConnectFourEnv, TicTacToeEnv
-from rl_book.methods.inference import test_again_user
+from rl_book.methods.inference import test_against_user
 from rl_book.methods.mc import OffPolicyMC, OnPolicyMC
 from rl_book.methods.method import MethodWithStats
 from rl_book.methods.misc import Random
@@ -41,12 +41,12 @@ def benchmark_multi_player(env_name: str) -> None:
     ]
     zoo = [MethodWithStats(Random(env))]
     # Train given methods
-    train_multi_player(env, methods, zoo, max_steps=100000, plot_interval=100)
+    train_multi_player(env, methods, zoo, max_steps=100, plot_interval=100)
 
     # Now give user chance to play against one of the methods
     # TOOD: need good wrapper from action to input
     env = get_env(env_name, "human")
-    test_again_user(env, methods[1].method)
+    test_against_user(env, methods[1].method)
 
 
 if __name__ == "__main__":

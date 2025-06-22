@@ -119,6 +119,11 @@ class MultiPlayerEnv(ParametrizedEnv):
 
     def get_game_result(self, reward) -> GameResult:
         raise NotImplementedError
+    
+    def user_query(self):
+        # TODO: potentially mask non-avail actions
+        raise NotImplementedError
+
 
 
 class TicTacToeEnv(MultiPlayerEnv):
@@ -159,6 +164,14 @@ class TicTacToeEnv(MultiPlayerEnv):
             return GameResult.DRAW
         elif reward == -1:
             return GameResult.LOSS
+        
+    def user_query(self) -> str:
+        return "Please indicate in which cell to place your symbol.\nThe cells are indexed as follows:\n\
+        0 | 3 | 6\n\
+        _________\n\
+        1 | 4 | 7\n\
+        _________\n\
+        2 | 5 | 8"
 
 
 class ConnectFourEnv(MultiPlayerEnv):
