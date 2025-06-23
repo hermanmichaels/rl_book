@@ -100,7 +100,7 @@ def plot_results(
 def benchmark(
     methods: list,
     min_grid_size=5,
-    max_grid_size=15,
+    max_grid_size=20,
     extra_rewards: bool = True,
     eps_decay: bool = True,
     fig_path: str = "result.png",

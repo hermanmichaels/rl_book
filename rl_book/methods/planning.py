@@ -97,18 +97,19 @@ class DynaQ(RLMethod):
             next_state.state,
             cur_state.reward,
             step,
-        )  # TODO: cur or next reward?
+            next_state.mask
+        )
 
         for _ in range(self.n):
             observation, action = self.buffer.sample()
-            observation_new_sampled, reward, t_last = self.model[observation, action]
+            observation_new_sampled, reward, t_last, mask = self.model[observation, action]
             bonus_reward = kappa * np.sqrt(step - t_last) if self.plus_mode else 0.0
-            # TODO: mask is not reflected
 
+            allowed_actions = self.get_allowed_actions(mask)
             next_q = max(
                 [
                     self.Q[observation_new_sampled, a_]
-                    for a_ in range(self.env.get_action_space_len())
+                    for a_ in allowed_actions
                 ],
                 default=0,
             )
@@ -125,6 +126,10 @@ class DynaQ(RLMethod):
     def _load_weights(self, save_path: str) -> None:
         with open(save_path, 'rb') as f:
             self.Q, self.model = pickle.load(f)
+
+    # TODO: seemed essential for dyna-q, why?
+    def finalize(self, episode: list[ReplayItem], step: int) -> None:
+        self.update(episode, step)
 
 
 class TreeNode:
