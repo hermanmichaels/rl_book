@@ -1,16 +1,15 @@
 from abc import ABC
 
 import numpy as np
-from gymnasium.core import Env  # TODO: or any other env
 
-from rl_book.env import GameResult
+from rl_book.env import GameResult, ParametrizedEnv
 from rl_book.replay_utils import ReplayItem
 
 
 class RLMethod(ABC):
     """Base class for RL methods."""
 
-    def __init__(self, env: Env) -> None:
+    def __init__(self, env: ParametrizedEnv) -> None:
         self.env = env
         self._train = True
 
@@ -22,7 +21,9 @@ class RLMethod(ABC):
         """
         raise NotImplementedError
 
-    def act(self, state, step: int, mask: list[int] | None = None) -> int:
+    def act(
+        self, state: int, step: int | None = None, mask: list[int] | None = None
+    ) -> int:
         """Called during training to act when generating episodes.
 
         Args:
@@ -52,14 +53,6 @@ class RLMethod(ABC):
             step: current step
         """
         pass
-
-    def get_policy(self) -> np.ndarray:
-        """Returns the policy found by this method.
-
-        Returns:
-            Found policy
-        """
-        raise NotImplementedError
 
     def clone(self):
         cloned = self.__class__(self.env)

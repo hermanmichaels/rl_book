@@ -42,15 +42,15 @@ class DynaQ(RLMethod):
         self.model = defaultdict(lambda: (0, 0.0, 0))
         self.plus_mode = plus_mode
 
-    def get_name(self) -> str:  # todo: good style?
+    def get_name(self) -> str:
         return "DynaQ"
 
     def clone(self):
-        cloned = self.__class__(self.env)  # TOOD: args
+        cloned = self.__class__(self.env, self.n, self.plus_mode)
         cloned.Q = copy.deepcopy(self.Q)
         return cloned
 
-    def act(self, state: int, step: int, mask: list[int] | None = None):
+    def act(self, state: int, step: int | None = None, mask: list[int] | None = None):
         allowed_actions = self.get_allowed_actions(mask)
         if self._train and random.uniform(0, 1) < self.env.eps(step):
             return random.choice(allowed_actions)
@@ -61,7 +61,6 @@ class DynaQ(RLMethod):
             return random.choice(max_actions)
 
     def update(self, episode: list[ReplayItem], step: int) -> None:
-
         if len(episode) <= 1:
             return
 
@@ -244,8 +243,6 @@ def mcts(env: ParametrizedEnv, actions: list[int]) -> int:
     reset_env(env, actions)
     root = TreeNode()
 
-    action_space_n: int = int(get_observation_action_space(env)[1].n)
-
     for _ in range(NUM_MCTS_ITERATIONS):
         node = root
         reset_env(env, actions)
@@ -255,7 +252,7 @@ def mcts(env: ParametrizedEnv, actions: list[int]) -> int:
 
         # Expand leaf node.
         if not node.terminal:
-            node = expand(env, node, action_space_n)
+            node = expand(env, node, env.get_action_space_len())
 
         # Simulate step.
         truncated = False
@@ -264,7 +261,7 @@ def mcts(env: ParametrizedEnv, actions: list[int]) -> int:
 
         while not terminated and not truncated:
             # Use a random rollout policy.
-            action = random.randint(0, action_space_n - 1)
+            action = random.randint(0, env.get_action_space_len() - 1)
             _, reward, terminated, truncated, _ = env.env.step(action)
             total_reward += float(reward)
 

@@ -1,4 +1,5 @@
 from enum import Enum
+from typing import Any
 
 import numpy as np
 from gymnasium.core import Env  # TODO: or any other env
@@ -36,14 +37,14 @@ class ParametrizedEnv:
             )
         )
 
-    def obs_to_state(state):
+    def obs_to_state(state: Any) -> int:
         return state
 
     def get_action_space_len(self) -> int:
-        return self.env.action_space.n
+        raise NotImplementedError
 
     def get_observation_space_len(self) -> int:
-        return self.env.observation_space.n
+        raise NotImplementedError
 
 
 class GridWorldEnv(ParametrizedEnv):
@@ -91,6 +92,12 @@ class GridWorldEnv(ParametrizedEnv):
             ) - self.normalized_grid_position_sum(old_obs)
         return observation, reward, terminated, truncated, info
 
+    def get_action_space_len(self) -> int:
+        return self.env.action_space.n
+
+    def get_observation_space_len(self) -> int:
+        return self.env.observation_space.n
+
 
 class GameResult(Enum):
     INVALID = 0
@@ -119,11 +126,10 @@ class MultiPlayerEnv(ParametrizedEnv):
 
     def get_game_result(self, reward) -> GameResult:
         raise NotImplementedError
-    
+
     def user_query(self):
         # TODO: potentially mask non-avail actions
         raise NotImplementedError
-
 
 
 class TicTacToeEnv(MultiPlayerEnv):
@@ -132,10 +138,7 @@ class TicTacToeEnv(MultiPlayerEnv):
     def __init__(self, env: Env, gamma=0.95):
         super().__init__(env, gamma, ["player_1", "player_2"])
 
-    def get_observation_space_len(self):
-        return 3 ** (6 * 7 * 3 * 2)  # TODO?
-
-    def obs_to_state(self, obs, start_pos=None):
+    def obs_to_state(self, obs: np.ndarray, start_pos: int):
         board = obs  # shape: (3, 3, 2)
         state_flat = []
 
@@ -148,8 +151,7 @@ class TicTacToeEnv(MultiPlayerEnv):
                 else:
                     state_flat.append(0)  # empty
 
-        if start_pos:
-            state_flat.append(start_pos)
+        state_flat.append(start_pos)
 
         # Convert base-3 list to integer
         state = 0
@@ -164,7 +166,7 @@ class TicTacToeEnv(MultiPlayerEnv):
             return GameResult.DRAW
         elif reward == -1:
             return GameResult.LOSS
-        
+
     def user_query(self) -> str:
         return "Please indicate in which cell to place your symbol.\nThe cells are indexed as follows:\n\
         0 | 3 | 6\n\
@@ -177,13 +179,10 @@ class TicTacToeEnv(MultiPlayerEnv):
 class ConnectFourEnv(MultiPlayerEnv):
     """ConnectFour env."""
 
-    def __init__(self, env: Env, gamma=0.95) -> None:
+    def __init__(self, env: ParametrizedEnv, gamma=0.95) -> None:
         super().__init__(env, gamma, ["player_0", "player_1"])
 
-    def get_observation_space_len(self):
-        return 3 ** (6 * 7 * 3 * 2)  # TODO?
-
-    def obs_to_state(self, state, start_pos=None):
+    def obs_to_state(self, state: np.ndarray, start_pos: int):
         board = state  # shape: (6, 7, 2)
         state_flat = []
 
@@ -196,8 +195,7 @@ class ConnectFourEnv(MultiPlayerEnv):
                 else:
                     state_flat.append(0)  # empty
 
-        if start_pos is not None:
-            state_flat.append(start_pos)
+        state_flat.append(start_pos)
 
         # Convert to base-3 integer
         state = 0
@@ -205,7 +203,7 @@ class ConnectFourEnv(MultiPlayerEnv):
             state += val * (3**i)
 
         return state
-    
+
     def get_game_result(self, reward: float) -> GameResult:
         if reward == 1:
             return GameResult.WIN
@@ -213,10 +211,12 @@ class ConnectFourEnv(MultiPlayerEnv):
             return GameResult.DRAW
         elif reward == -1:
             return GameResult.LOSS
-        
+
     def user_query(self) -> str:
-        return "Please indicate in which column in which to drop the next token (0 - 6):"
-    
+        return (
+            "Please indicate in which column in which to drop the next token (0 - 6):"
+        )
+
     # def step(self, action: int) -> tuple[int, float, bool, bool, dict]:
     #     # TODO: include in env?
     #     observation, reward, terminated, truncated, info = self.env.step(action)

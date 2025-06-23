@@ -1,5 +1,4 @@
 import numpy as np
-from gymnasium.core import Env
 
 from rl_book.env import ParametrizedEnv
 from rl_book.methods.method import RLMethod
@@ -7,7 +6,6 @@ from rl_book.methods.method import RLMethod
 EPS = 0.05
 
 
-# TODO: share?
 def extract_policy(
     V: np.ndarray,
     observation_space_len: int,

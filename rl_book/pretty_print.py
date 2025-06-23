@@ -1,5 +1,7 @@
 import sys
 
+from rl_book.methods.method import MethodWithStats
+
 GREEN = "\033[92m"
 YELLOW = "\033[93m"
 RED = "\033[91m"
@@ -7,7 +9,7 @@ RESET = "\033[0m"
 BOLD = "\033[1m"
 
 
-def log_methods(methods, step):
+def log_methods(methods: list[MethodWithStats], step: int) -> None:
     sorted_methods = sorted(methods, key=lambda x: -x.get_win_ratio())
     max_name_len = max(len(m.method.get_name()) for m in methods)
     separator = "-" * (max_name_len) + "|" + ("-" * 26)

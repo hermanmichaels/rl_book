@@ -4,6 +4,7 @@ from typing import Callable
 
 import matplotlib.pyplot as plt
 import numpy as np
+
 from rl_book.env import MultiPlayerEnv, ParametrizedEnv
 from rl_book.methods.method import MethodWithStats, RLMethod
 from rl_book.pretty_print import log_methods
@@ -127,7 +128,7 @@ def train_multi_player(
             env.env.step(action)
 
             _, reward, _, _, _ = env.env.last()
-            reward += 0.1
+            reward += 0.1  # TODO
 
             if (
                 env.env.agent_selection == env.players[player_pos]

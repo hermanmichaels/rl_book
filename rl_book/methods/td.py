@@ -22,7 +22,9 @@ class TDMethod(RLMethod):
         cloned.Q = copy.deepcopy(self.Q)
         return cloned
 
-    def act(self, state: int, step: int, mask: list[int] | None = None) -> int:
+    def act(
+        self, state: int, step: int | None = None, mask: list[int] | None = None
+    ) -> int:
         allowed_actions = self.get_allowed_actions(mask)
         if self._train and random.uniform(0, 1) < self.env.eps(step):
             return random.choice(allowed_actions)
@@ -34,7 +36,7 @@ class TDMethod(RLMethod):
 
 
 class Sarsa(TDMethod):
-    def get_name(self) -> str:  # todo: good style?
+    def get_name(self) -> str:
         return "Sarsa"
 
     def update(self, episode: list[ReplayItem], step: int) -> None:
@@ -107,9 +109,9 @@ class ExpectedSarsa(TDMethod):
             cur_state.reward - self.Q[cur_state.state, cur_state.action]
         )
 
-        actions = self.get_allowed_actions(next_state.mask)  # todo: next state?
+        actions = self.get_allowed_actions(next_state.mask)
 
-        for a in actions:  # TOOD: mask
+        for a in actions:
             updated_q_value += (
                 self.env.gamma
                 * ALPHA

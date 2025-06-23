@@ -1,21 +1,23 @@
+from rl_book.env import ParametrizedEnv
+from rl_book.methods.method import RLMethod
+
 NUM_STEPS = 1000
 
 
-def test_single_player(env, method):
+def test_single_player(env: ParametrizedEnv, method: RLMethod) -> None:
     method.eval()
 
-    # Test policy and visualize found solution
     observation, _ = env.reset()
 
     for _ in range(NUM_STEPS):
-        action = method.act(observation, 1000)
+        action = method.act(observation)
         observation, _, terminated, truncated, _ = env.step(action)
         if terminated or truncated:
             break
     env.close()
 
 
-def test_against_user(env, method):
+def test_against_user(env: ParametrizedEnv, method: RLMethod) -> None:
     env.env.reset()
 
     for agent in env.env.agent_iter():
@@ -28,7 +30,7 @@ def test_against_user(env, method):
 
             state = env.obs_to_state(observation["observation"], 0)
             if agent == "player_1":
-                action = method.act(state, 1000, mask)
+                action = method.act(state, mask=mask)
             else:
                 # action = methods[0].method.act(state, mask)
                 action = int(input(env.user_query()))

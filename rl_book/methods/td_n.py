@@ -77,7 +77,6 @@ class TreeN(TDMethod):
         for tau in range(len(episode) - self.n - 1, len(episode)):
             self.update(episode, step, tau)
 
-    # TODO: share
     def _get_action_prob(self, observation: int, action: int) -> float:
         probs = [self.Q[observation, a] for a in range(self.env.get_action_space_len())]
         probs = np.exp(probs - np.max(probs))
@@ -95,15 +94,17 @@ class TreeN(TDMethod):
             if is_final:
                 G = replay_buffer[-1].reward
             else:
+                allowed_actions = self.get_allowed_actions(replay_buffer[-1].mask)
                 G = replay_buffer[-2].reward + self.env.gamma * sum(
                     [
                         self._get_action_prob(replay_buffer[-1].state, a)
                         * self.Q[replay_buffer[-1].state, a]
-                        for a in range(self.env.get_action_space_len())
+                        for a in allowed_actions
                     ]
                 )
 
             for k in range(len(replay_buffer) - 2, tau, -1):
+                allowed_actions = self.get_allowed_actions(replay_buffer[k].mask)
                 G = (
                     replay_buffer[k - 1].reward
                     + self.env.gamma
@@ -111,7 +112,7 @@ class TreeN(TDMethod):
                         [
                             self._get_action_prob(replay_buffer[k].state, a)
                             * self.Q[replay_buffer[k].state, a]
-                            for a in range(self.env.get_action_space_len())
+                            for a in allowed_actions
                             if a != replay_buffer[k].action
                         ]
                     )

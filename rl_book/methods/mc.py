@@ -2,7 +2,6 @@ import copy
 from collections import defaultdict
 
 import numpy as np
-from gymnasium.core import Env
 
 from rl_book.env import ParametrizedEnv
 from rl_book.methods.method import RLMethod
@@ -20,7 +19,9 @@ class MCMethod(RLMethod):
         cloned.Q = copy.deepcopy(self.Q)
         return cloned
 
-    def act(self, state: int, step: int, mask: list[int] | None = None) -> int:
+    def act(
+        self, state: int, step: int | None = None, mask: list[int] | None = None
+    ) -> int:
         actions = self.get_allowed_actions(mask)
         probs = [self.pi[state, a] for a in actions]
 
@@ -84,7 +85,7 @@ class OffPolicyMC(MCMethod):
     def get_name(self) -> str:
         return "OffPolicyMC"
 
-    def get_eps_greedy_policy(self, step):
+    def set_eps_greedy_behavior_policy(self, step: int) -> None:
         n_actions = self.env.get_action_space_len()
         eps = self.env.eps(step)
         seen_states = {s for s, _ in self.Q.keys()}
@@ -113,14 +114,14 @@ class OffPolicyMC(MCMethod):
             G = self.env.gamma * G + r
             self.C[s, a] += W
             self.Q[s, a] += W / self.C[s, a] * (G - self.Q[s, a])
-            follow = [
+            next_qs = [
                 self.Q[s, a_] if a_ in actions else self.Q[s, a] - np.inf
                 for a_ in range(self.env.get_action_space_len())
-            ]  # todo: mask?
-            if a != np.argmax(follow):
+            ]
+            if a != np.argmax(next_qs):
                 break
             W *= 1 / (self.pi[s, a])
 
         # Improve the behavior policy by any kind of greedy policy - in particular
         # here we form an ε-greedy policy from Q.
-        self.get_eps_greedy_policy(step)
+        self.set_eps_greedy_behavior_policy(step)
