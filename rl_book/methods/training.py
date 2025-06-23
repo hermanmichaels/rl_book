@@ -80,7 +80,7 @@ def train_multi_player(
         max_steps: maixmal number of update steps
     """
     # For plotting: keep (step, win_ratio) tuples for every method at different steps.
-    win_ratios = [[(0, method.get_win_ratio())] for method in methods]
+    win_ratios = [[] for method in methods]
 
     for step in range(max_steps):
         env.env.reset()
@@ -166,7 +166,7 @@ def train_multi_player(
 
         methods[method_idx].method.finalize(episode, step)
 
-        if plot_interval and step % plot_interval == 0:
+        if plot_interval and step % plot_interval == 0 and step > 0:
             for idx, method in enumerate(methods):
                 win_ratios[idx].append((step, method.get_win_ratio()))
 
@@ -180,6 +180,9 @@ def train_multi_player(
             plt.savefig("wins.png")
 
             log_methods(methods, step)
+
+            for method in methods:
+                method.method.save_weights()
 
         if step % zoo_update_interval == 0:
             zoo.append(methods[method_idx].clone())

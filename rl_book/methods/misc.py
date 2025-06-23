@@ -1,4 +1,5 @@
 import random
+from typing import Any
 
 import numpy as np
 
@@ -15,3 +16,6 @@ class Random(RLMethod):
     def act(self, state: int, step: int | None = None, mask: np.ndarray | None = None):
         allowed_actions = self.get_allowed_actions(mask)
         return random.choice(allowed_actions)
+    
+    def _get_save_data(self) -> Any:
+        return None

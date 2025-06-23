@@ -1,7 +1,8 @@
 import copy
+import pickle
 import random
 from collections import defaultdict
-from typing import DefaultDict
+from typing import Any, DefaultDict
 
 import numpy as np
 
@@ -13,12 +14,12 @@ ALPHA = 0.1
 
 
 class TDMethod(RLMethod):
-    def __init__(self, env: ParametrizedEnv) -> None:
-        super().__init__(env)
+    def __init__(self, env: ParametrizedEnv, load_weights: bool = False) -> None:
+        super().__init__(env, load_weights)
         self.Q: DefaultDict[tuple[int, int], float] = defaultdict(float)
 
     def clone(self) -> "TDMethod":
-        cloned = self.__class__(self.env)
+        cloned = self.__class__(self.env, False)
         cloned.Q = copy.deepcopy(self.Q)
         return cloned
 
@@ -33,6 +34,13 @@ class TDMethod(RLMethod):
             max_q = max(q_values)
             max_actions = [a for a, q in zip(allowed_actions, q_values) if q == max_q]
             return random.choice(max_actions)
+        
+    def _get_save_data(self) -> Any:
+        return self.Q
+    
+    def _load_weights(self, save_path: str) -> None:
+        with open(save_path, 'rb') as f:
+            self.Q = pickle.load(f)
 
 
 class Sarsa(TDMethod):
@@ -129,8 +137,8 @@ class DoubleQ(TDMethod):
     def get_name(self) -> str:
         return "DoubleQ"
 
-    def __init__(self, env: ParametrizedEnv) -> None:
-        super().__init__(env)
+    def __init__(self, env: ParametrizedEnv, load_weights: bool = False) -> None:
+        super().__init__(env, load_weights)
         self.Q_2: DefaultDict[tuple[int, int], float] = defaultdict(float)
 
     def update(self, episode: list[ReplayItem], step: int) -> None:
@@ -171,3 +179,10 @@ class DoubleQ(TDMethod):
 
     def finalize(self, episode: list[ReplayItem], step: int) -> None:
         self.update(episode, step)
+
+    def _get_save_data(self) -> Any:
+        return self.Q, self.Q_2
+    
+    def _load_weights(self, save_path: str) -> None:
+        with open(save_path, 'rb') as f:
+            self.Q, self.Q_2 = pickle.load(f)

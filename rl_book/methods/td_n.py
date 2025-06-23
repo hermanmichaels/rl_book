@@ -5,13 +5,14 @@ import numpy as np
 from rl_book.env import ParametrizedEnv
 from rl_book.methods.td import TDMethod
 from rl_book.replay_utils import ReplayItem
+from rl_book.utils import ConstantFactory
 
 ALPHA = 0.1
 
 
 class SarsaN(TDMethod):
-    def __init__(self, env: ParametrizedEnv, n: int = 3) -> None:
-        super().__init__(env)
+    def __init__(self, env: ParametrizedEnv, load_weights: bool = False, n: int = 3) -> None:
+        super().__init__(env, load_weights)
         self.n = n
 
     def get_name(self) -> str:
@@ -57,9 +58,9 @@ class SarsaN(TDMethod):
 
 
 class TreeN(TDMethod):
-    def __init__(self, env, n: int = 3):
-        super().__init__(env)
-        self.Q = defaultdict(lambda: 0.1)
+    def __init__(self, env: ParametrizedEnv, load_weights: bool, n: int = 3):
+        super().__init__(env, load_weights)
+        self.Q = defaultdict(ConstantFactory(0.1))
         self.n = n
 
     def get_name(self) -> str:

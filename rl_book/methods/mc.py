@@ -1,19 +1,21 @@
 import copy
 from collections import defaultdict
-from typing import DefaultDict
+import pickle
+from typing import Any, DefaultDict
 
 import numpy as np
 
 from rl_book.env import ParametrizedEnv
 from rl_book.methods.method import RLMethod
 from rl_book.replay_utils import ReplayItem
+from rl_book.utils import ConstantFactory
 
 
 class MCMethod(RLMethod):
-    def __init__(self, env: ParametrizedEnv) -> None:
-        super().__init__(env)
+    def __init__(self, env: ParametrizedEnv, load_weights: bool = False) -> None:
+        super().__init__(env, load_weights)
         self.Q: DefaultDict[tuple[int, int], float] = defaultdict(float)
-        self.pi: DefaultDict[tuple[int, int], float] = defaultdict(lambda: 1.0)
+        self.pi: DefaultDict[tuple[int, int], float] = defaultdict(ConstantFactory(1.))
 
     def clone(self):
         cloned = super().clone()
@@ -32,11 +34,19 @@ class MCMethod(RLMethod):
             return np.random.choice(actions, p=probs)
         else:
             return actions[np.argmax(probs_arr)]
+        
+    def _get_save_data(self) -> Any:
+        return self.Q, self.pi
+
+    def _load_weights(self, save_path: str) -> None:
+        with open(save_path, 'rb') as f:
+            self.Q, self.pi = pickle.load(f)
+
 
 
 class OnPolicyMC(MCMethod):
-    def __init__(self, env):
-        super().__init__(env)
+    def __init__(self, env: ParametrizedEnv, load_weights: bool = False):
+        super().__init__(env, load_weights)
         self.counts = defaultdict(int)
 
     def get_name(self) -> str:
@@ -79,8 +89,8 @@ class OnPolicyMC(MCMethod):
 
 
 class OffPolicyMC(MCMethod):
-    def __init__(self, env):
-        super().__init__(env)
+    def __init__(self, env: ParametrizedEnv, load_weights: bool = False):
+        super().__init__(env, load_weights)
         self.C = defaultdict(int)
 
     def get_name(self) -> str:

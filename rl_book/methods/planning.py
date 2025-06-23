@@ -1,7 +1,8 @@
 import copy
+import pickle
 import random
 from collections import defaultdict
-from typing import DefaultDict, Optional
+from typing import Any, DefaultDict, Optional
 
 import numpy as np
 
@@ -27,20 +28,23 @@ class ReplayBuffer:
     def sample(self) -> tuple[int, int]:
         return self.replay_buffer[random.randint(0, len(self.replay_buffer) - 1)]
 
+def model_factory():
+    return 0, 0.0, 0
 
 class DynaQ(RLMethod):
     def __init__(
         self,
         env: ParametrizedEnv,
+        load_weights: bool = False,
         n: int = 3,
         plus_mode: bool = False,
     ):
-        super().__init__(env)
+        super().__init__(env, load_weights)
         self.Q: DefaultDict[tuple[int, int], float] = defaultdict(float)
         self.n = n
         self.buffer = ReplayBuffer()
         self.model: DefaultDict[tuple[int, int], tuple[int, float, int]] = defaultdict(
-            lambda: (0, 0.0, 0)
+            model_factory
         )
         self.plus_mode = plus_mode
 
@@ -48,7 +52,7 @@ class DynaQ(RLMethod):
         return "DynaQ"
 
     def clone(self):
-        cloned = self.__class__(self.env, self.n, self.plus_mode)
+        cloned = self.__class__(self.env, False, self.n, self.plus_mode)
         cloned.Q = copy.deepcopy(self.Q)
         return cloned
 
@@ -114,6 +118,13 @@ class DynaQ(RLMethod):
                 + self.env.gamma * next_q
                 - self.Q[observation, action]
             )
+
+    def _get_save_data(self) -> Any:
+        return self.Q, self.model
+    
+    def _load_weights(self, save_path: str) -> None:
+        with open(save_path, 'rb') as f:
+            self.Q, self.model = pickle.load(f)
 
 
 class TreeNode:

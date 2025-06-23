@@ -25,24 +25,24 @@ def get_env(env_name: str, render_mode=None):
     return env
 
 
-def benchmark_multi_player(env_name: str) -> None:
+def benchmark_multi_player(env_name: str, load_weights: bool) -> None:
     env = get_env(env_name)
 
     methods = [
         MethodWithStats(Random(env)),
-        MethodWithStats(OnPolicyMC(env)),
-        MethodWithStats(OffPolicyMC(env)),
-        MethodWithStats(QLearning(env)),
-        MethodWithStats(Sarsa(env)),
-        MethodWithStats(ExpectedSarsa(env)),
-        MethodWithStats(DoubleQ(env)),
-        MethodWithStats(SarsaN(env)),
-        MethodWithStats(TreeN(env)),
-        MethodWithStats(DynaQ(env)),
+        MethodWithStats(OnPolicyMC(env, load_weights=load_weights)),
+        MethodWithStats(OffPolicyMC(env, load_weights=load_weights)),
+        MethodWithStats(QLearning(env, load_weights=load_weights)),
+        MethodWithStats(Sarsa(env, load_weights=load_weights)),
+        MethodWithStats(ExpectedSarsa(env, load_weights=load_weights)),
+        MethodWithStats(DoubleQ(env, load_weights=load_weights)),
+        MethodWithStats(SarsaN(env, load_weights=load_weights)),
+        MethodWithStats(TreeN(env, load_weights=load_weights)),
+        MethodWithStats(DynaQ(env, load_weights=load_weights)),
     ]
     zoo = [MethodWithStats(Random(env))]
     # Train given methods
-    train_multi_player(env, methods, zoo, max_steps=100000, plot_interval=100)
+    train_multi_player(env, methods, zoo, max_steps=100000, plot_interval=1000)
 
     # Now give user chance to play against one of the methods
     # TOOD: need good wrapper from action to input
@@ -55,5 +55,6 @@ if __name__ == "__main__":
         description="Benchmark RL methods in multi-player setup"
     )
     parser.add_argument("--env", type=str, required=True, help="Env")
+    parser.add_argument('--load', action='store_true')
     args = parser.parse_args()
-    benchmark_multi_player(args.env)
+    benchmark_multi_player(args.env, args.load)
