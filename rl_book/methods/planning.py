@@ -1,7 +1,7 @@
 import copy
 import random
 from collections import defaultdict
-from typing import Optional
+from typing import DefaultDict, Optional
 
 import numpy as np
 
@@ -36,10 +36,12 @@ class DynaQ(RLMethod):
         plus_mode: bool = False,
     ):
         super().__init__(env)
-        self.Q = defaultdict(float)
+        self.Q: DefaultDict[tuple[int, int], float] = defaultdict(float)
         self.n = n
         self.buffer = ReplayBuffer()
-        self.model = defaultdict(lambda: (0, 0.0, 0))
+        self.model: DefaultDict[tuple[int, int], tuple[int, float, int]] = defaultdict(
+            lambda: (0, 0.0, 0)
+        )
         self.plus_mode = plus_mode
 
     def get_name(self) -> str:
@@ -50,9 +52,9 @@ class DynaQ(RLMethod):
         cloned.Q = copy.deepcopy(self.Q)
         return cloned
 
-    def act(self, state: int, step: int | None = None, mask: list[int] | None = None):
+    def act(self, state: int, step: int | None = None, mask: np.ndarray | None = None):
         allowed_actions = self.get_allowed_actions(mask)
-        if self._train and random.uniform(0, 1) < self.env.eps(step):
+        if self._train and step and random.uniform(0, 1) < self.env.eps(step):
             return random.choice(allowed_actions)
         else:
             q_values = [self.Q[state, a] for a in allowed_actions]

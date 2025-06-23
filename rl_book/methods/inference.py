@@ -1,10 +1,12 @@
-from rl_book.env import ParametrizedEnv
+from gymnasium.core import Env
+
+from rl_book.env import MultiPlayerEnv
 from rl_book.methods.method import RLMethod
 
 NUM_STEPS = 1000
 
 
-def test_single_player(env: ParametrizedEnv, method: RLMethod) -> None:
+def test_single_player(env: Env, method: RLMethod) -> None:
     method.eval()
 
     observation, _ = env.reset()
@@ -17,11 +19,17 @@ def test_single_player(env: ParametrizedEnv, method: RLMethod) -> None:
     env.close()
 
 
-def test_against_user(env: ParametrizedEnv, method: RLMethod) -> None:
+def test_against_user(env: MultiPlayerEnv, method: RLMethod) -> None:
     env.env.reset()
 
-    for agent in env.env.agent_iter():
-        observation, _, termination, truncation, info = env.env.last()
+    for agent in env.env.agent_iter():  # type: ignore
+        (
+            observation,
+            _,
+            termination,
+            truncation,
+            info,
+        ) = env.env.last()  # type: ignore
 
         if termination or truncation:
             action = None

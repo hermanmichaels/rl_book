@@ -20,7 +20,7 @@ def solve_grid_world() -> None:
         map_name="4x4",
         is_slippery=False,
     )
-    env_train = ParametrizedEnv(gym_env_train, GAMMA, EPS)
+    env_train = ParametrizedEnv(gym_env_train, GAMMA, False)
 
     gym_env_test = gym.make(
         "FrozenLake-v1",

@@ -2,7 +2,7 @@ import argparse
 
 from pettingzoo.classic import connect_four_v3, tictactoe_v3
 
-from rl_book.env import ConnectFourEnv, TicTacToeEnv
+from rl_book.env import ConnectFourEnv, MultiPlayerEnv, TicTacToeEnv
 from rl_book.methods.inference import test_against_user
 from rl_book.methods.mc import OffPolicyMC, OnPolicyMC
 from rl_book.methods.method import MethodWithStats
@@ -14,6 +14,7 @@ from rl_book.methods.training import train_multi_player
 
 
 def get_env(env_name: str, render_mode=None):
+    env: MultiPlayerEnv
     if env_name == "TicTacToe":
         env = TicTacToeEnv(tictactoe_v3.env(render_mode=render_mode), 0.95)
     elif env_name == "ConnectFour":

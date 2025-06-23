@@ -22,7 +22,7 @@ class RLMethod(ABC):
         raise NotImplementedError
 
     def act(
-        self, state: int, step: int | None = None, mask: list[int] | None = None
+        self, state: int, step: int | None = None, mask: np.ndarray | None = None
     ) -> int:
         """Called during training to act when generating episodes.
 
@@ -34,7 +34,7 @@ class RLMethod(ABC):
         Returns:
             selected action
         """
-        return NotImplementedError
+        raise NotImplementedError
 
     def update(self, episode: list[ReplayItem], step: int) -> None:
         """Updates the method's parameters.
@@ -58,7 +58,7 @@ class RLMethod(ABC):
         cloned = self.__class__(self.env)
         return cloned
 
-    def get_allowed_actions(self, mask: np.ndarray) -> np.ndarray:
+    def get_allowed_actions(self, mask: np.ndarray | None) -> np.ndarray:
         """Gets the allowed action indices.
 
         Args:
@@ -70,7 +70,7 @@ class RLMethod(ABC):
         return (
             np.nonzero(mask)[0].tolist()
             if mask is not None
-            else [a for a in range(self.env.get_action_space_len())]
+            else np.asarray([a for a in range(self.env.get_action_space_len())])
         )
 
     def train(self):

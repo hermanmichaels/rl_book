@@ -1,5 +1,7 @@
 import random
 
+import numpy as np
+
 from rl_book.methods.method import RLMethod
 
 
@@ -10,6 +12,6 @@ class Random(RLMethod):
     def get_name(self) -> str:
         return "Random"
 
-    def act(self, state: int, step: int | None = None, mask: list[int] | None = None):
+    def act(self, state: int, step: int | None = None, mask: np.ndarray | None = None):
         allowed_actions = self.get_allowed_actions(mask)
         return random.choice(allowed_actions)

@@ -3,7 +3,6 @@ import random
 from typing import Callable
 
 import matplotlib.pyplot as plt
-import numpy as np
 
 from rl_book.env import MultiPlayerEnv, ParametrizedEnv
 from rl_book.methods.method import MethodWithStats, RLMethod
@@ -16,7 +15,7 @@ def train_single_player(
     method: RLMethod,
     max_steps: int = 100,
     callback: Callable | None = None,
-) -> tuple[bool, np.ndarray, int]:
+) -> tuple[bool, int]:
     """Trains a method on single-player environments.
 
     Args:
@@ -52,7 +51,7 @@ def train_single_player(
             if cur_episode_len > 100:
                 break
 
-        episode.append(ReplayItem(observation_new, -1, reward, []))  # why? sarsa?
+        episode.append(ReplayItem(observation_new, -1, reward, None))  # why? sarsa?
         method.finalize(episode, step)
 
         if callback and callback(method, step):
@@ -70,7 +69,7 @@ def train_multi_player(
     max_steps: int = 100,
     zoo_update_interval: int = 50,
     zoo_size: int = 50,
-    plot_interval: int = None,
+    plot_interval: int | None = None,
 ) -> None:
     """Trains a method on multi-player environments (atm only 2 players are supported).
 
@@ -102,8 +101,14 @@ def train_multi_player(
         episode = []
 
         while not done:
-            agent = env.env.agent_selection
-            observation, reward, termination, truncation, _ = env.env.last()
+            agent = env.env.agent_selection  # type: ignore
+            (
+                observation,
+                reward,
+                termination,
+                truncation,
+                _,
+            ) = env.env.last()  # type: ignore
 
             done = termination or truncation
 
@@ -111,10 +116,14 @@ def train_multi_player(
                 action = None
                 # Game over, rewards contains all playerss
                 methods[method_idx].update_result(
-                    env.get_game_result(env.env.rewards[env.players[player_pos]])
+                    env.get_game_result(
+                        env.env.rewards[env.players[player_pos]]  # type: ignore
+                    )
                 )
                 zoo[opponent_idx].update_result(
-                    env.get_game_result(env.env.rewards[env.players[1 - player_pos]])
+                    env.get_game_result(
+                        env.env.rewards[env.players[1 - player_pos]]  # type: ignore
+                    )
                 )
             else:
                 mask = observation["action_mask"]
@@ -127,16 +136,18 @@ def train_multi_player(
 
             env.env.step(action)
 
-            _, reward, _, _, _ = env.env.last()
+            _, reward, _, _, _ = env.env.last()  # type: ignore
             reward += 0.1  # TODO
 
             if (
-                env.env.agent_selection == env.players[player_pos]
-                and env.env.agent_selection in state_dict
+                env.env.agent_selection == env.players[player_pos]  # type: ignore
+                and env.env.agent_selection in state_dict  # type: ignore
             ):
                 s, a, mask = state_dict[env.players[player_pos]]
 
-                observation_new = env.env.observe(env.players[player_pos])
+                observation_new = env.env.observe(
+                    env.players[player_pos]
+                )  # type: ignore
 
                 episode.append(ReplayItem(s, a, reward, mask))
 
@@ -144,10 +155,12 @@ def train_multi_player(
 
         episode.append(
             ReplayItem(
-                env.obs_to_state(observation_new["observation"], player_pos),
+                env.obs_to_state(
+                    observation_new["observation"], player_pos
+                ),  # type: ignore
                 -1,
                 0,
-                [],  # TODO: needed?
+                None,  # TODO: needed?
             )
         )
 

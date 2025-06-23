@@ -7,6 +7,7 @@ from rl_book.env import GridWorldEnv
 from rl_book.methods.dp import policy_iteration, value_iteration
 from rl_book.methods.inference import test_single_player
 from rl_book.methods.mc import OffPolicyMC, OnPolicyMC
+from rl_book.methods.method import RLMethod
 from rl_book.methods.planning import DynaQ
 from rl_book.methods.td import DoubleQ, ExpectedSarsa, QLearning, Sarsa
 from rl_book.methods.td_n import SarsaN, TreeN
@@ -36,6 +37,7 @@ def solve_grid_world(method_name: str) -> None:
     )
 
     # Find policy
+    method: RLMethod
     if method_name == "policy_iteration":
         method = policy_iteration(env_train)
     elif method_name == "value_iteration":

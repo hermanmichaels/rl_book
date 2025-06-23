@@ -37,8 +37,11 @@ class ParametrizedEnv:
             )
         )
 
-    def obs_to_state(state: Any) -> int:
-        return state
+    def obs_to_state(self, obs: Any, start_pos: int = 0) -> int:
+        return obs
+
+    def step(self, action: int, old_obs: int) -> tuple[int, float, bool, bool, dict]:
+        raise NotImplementedError
 
     def get_action_space_len(self) -> int:
         raise NotImplementedError
@@ -93,10 +96,12 @@ class GridWorldEnv(ParametrizedEnv):
         return observation, reward, terminated, truncated, info
 
     def get_action_space_len(self) -> int:
-        return self.env.action_space.n
+        assert isinstance(self.env.action_space, Discrete)
+        return int(self.env.action_space.n)
 
     def get_observation_space_len(self) -> int:
-        return self.env.observation_space.n
+        assert isinstance(self.env.observation_space, Discrete)
+        return int(self.env.observation_space.n)
 
 
 class GameResult(Enum):
@@ -110,18 +115,19 @@ class MultiPlayerEnv(ParametrizedEnv):
     """Wrapper around multi-player game envs.
     Atm only 2-player games are supported."""
 
-    def __init__(
-        self, env: Env, gamma: float, players: list[str]
-    ) -> None:  # TODO: wrong env
+    def __init__(self, env: Env, gamma: float, players: list[str]) -> None:
         super().__init__(env, gamma, True)
         if not len(players) == 2:
             raise ValueError(f"Expected two players, but got {players}")
         self.players = players
 
     def get_action_space_len(self) -> int:
-        return self.env.action_space(self.players[0]).n
+        return self.env.action_space(self.players[0]).n  # type: ignore
 
     def get_observation_space_len(self) -> int:
+        raise NotImplementedError
+
+    def obs_to_state(self, obs: Any, player_pos: int = 0) -> int:
         raise NotImplementedError
 
     def get_game_result(self, reward) -> GameResult:
@@ -138,7 +144,7 @@ class TicTacToeEnv(MultiPlayerEnv):
     def __init__(self, env: Env, gamma=0.95):
         super().__init__(env, gamma, ["player_1", "player_2"])
 
-    def obs_to_state(self, obs: np.ndarray, start_pos: int):
+    def obs_to_state(self, obs: Any, start_pos: int = 0) -> int:
         board = obs  # shape: (3, 3, 2)
         state_flat = []
 
@@ -166,9 +172,12 @@ class TicTacToeEnv(MultiPlayerEnv):
             return GameResult.DRAW
         elif reward == -1:
             return GameResult.LOSS
+        else:
+            raise ValueError(f"Unexpected game-ending reward {reward}")
 
     def user_query(self) -> str:
-        return "Please indicate in which cell to place your symbol.\nThe cells are indexed as follows:\n\
+        return "Please indicate in which cell to place your symbol.\n\
+        The cells are indexed as follows:\n\
         0 | 3 | 6\n\
         _________\n\
         1 | 4 | 7\n\
@@ -179,11 +188,11 @@ class TicTacToeEnv(MultiPlayerEnv):
 class ConnectFourEnv(MultiPlayerEnv):
     """ConnectFour env."""
 
-    def __init__(self, env: ParametrizedEnv, gamma=0.95) -> None:
+    def __init__(self, env: Env, gamma=0.95) -> None:
         super().__init__(env, gamma, ["player_0", "player_1"])
 
-    def obs_to_state(self, state: np.ndarray, start_pos: int):
-        board = state  # shape: (6, 7, 2)
+    def obs_to_state(self, obs: Any, start_pos: int = 0) -> int:
+        board = obs  # shape: (6, 7, 2)
         state_flat = []
 
         for row in range(6):
@@ -198,11 +207,11 @@ class ConnectFourEnv(MultiPlayerEnv):
         state_flat.append(start_pos)
 
         # Convert to base-3 integer
-        state = 0
+        state_encoded = 0
         for i, val in enumerate(state_flat):
-            state += val * (3**i)
+            state_encoded += val * (3**i)
 
-        return state
+        return state_encoded
 
     def get_game_result(self, reward: float) -> GameResult:
         if reward == 1:
@@ -211,6 +220,8 @@ class ConnectFourEnv(MultiPlayerEnv):
             return GameResult.DRAW
         elif reward == -1:
             return GameResult.LOSS
+        else:
+            raise ValueError(f"Unexpected game ending reward {reward}")
 
     def user_query(self) -> str:
         return (

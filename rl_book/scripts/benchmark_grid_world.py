@@ -4,9 +4,10 @@ from typing import Callable
 
 import gymnasium as gym
 import matplotlib.pyplot as plt
+from gymnasium.core import Env
 from gymnasium.envs.toy_text.frozen_lake import generate_random_map
 
-from rl_book.env import GridWorldEnv, ParametrizedEnv
+from rl_book.env import GridWorldEnv
 from rl_book.methods.mc import OffPolicyMC, OnPolicyMC
 from rl_book.methods.method import RLMethod
 from rl_book.methods.planning import DynaQ
@@ -41,7 +42,7 @@ def get_check_frequency(step: int) -> int:
         return 10000
 
 
-def success_callback(method: RLMethod, step: int, env: ParametrizedEnv) -> bool:
+def success_callback(method: RLMethod, step: int, env: Env) -> bool:
     """Tests whether the given policy can successfully solve the given Gridworld
     environment.
 

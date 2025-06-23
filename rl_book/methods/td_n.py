@@ -1,18 +1,10 @@
 from collections import defaultdict
-from dataclasses import dataclass
 
 import numpy as np
 
 from rl_book.env import ParametrizedEnv
 from rl_book.methods.td import TDMethod
-
-
-@dataclass
-class ReplayItem:
-    state: int
-    action: int
-    reward: float
-
+from rl_book.replay_utils import ReplayItem
 
 ALPHA = 0.1
 

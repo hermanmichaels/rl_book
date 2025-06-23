@@ -2,7 +2,7 @@ import gymnasium as gym
 import pytest
 from pettingzoo.classic import connect_four_v3, tictactoe_v3
 
-from rl_book.env import GridWorldEnv, TicTacToeEnv
+from rl_book.env import ConnectFourEnv, GridWorldEnv, TicTacToeEnv
 
 
 @pytest.fixture
@@ -19,3 +19,7 @@ def grid_world_env() -> GridWorldEnv:
 @pytest.fixture
 def tic_tac_toe_env() -> TicTacToeEnv:
     return TicTacToeEnv(tictactoe_v3.env(), 0.99)
+
+@pytest.fixture
+def connect_four_env() -> ConnectFourEnv:
+    return ConnectFourEnv(connect_four_v3.env(), 0.99)

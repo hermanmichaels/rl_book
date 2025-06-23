@@ -1,9 +1,9 @@
 import copy
 import random
 from collections import defaultdict
+from typing import DefaultDict
 
 import numpy as np
-from gymnasium.core import Env
 
 from rl_book.env import ParametrizedEnv
 from rl_book.methods.method import RLMethod
@@ -13,9 +13,9 @@ ALPHA = 0.1
 
 
 class TDMethod(RLMethod):
-    def __init__(self, env: Env) -> None:
+    def __init__(self, env: ParametrizedEnv) -> None:
         super().__init__(env)
-        self.Q = defaultdict(float)
+        self.Q: DefaultDict[tuple[int, int], float] = defaultdict(float)
 
     def clone(self) -> "TDMethod":
         cloned = self.__class__(self.env)
@@ -23,10 +23,10 @@ class TDMethod(RLMethod):
         return cloned
 
     def act(
-        self, state: int, step: int | None = None, mask: list[int] | None = None
+        self, state: int, step: int | None = None, mask: np.ndarray | None = None
     ) -> int:
         allowed_actions = self.get_allowed_actions(mask)
-        if self._train and random.uniform(0, 1) < self.env.eps(step):
+        if self._train and step and random.uniform(0, 1) < self.env.eps(step):
             return random.choice(allowed_actions)
         else:
             q_values = [self.Q[state, a] for a in allowed_actions]
@@ -131,7 +131,7 @@ class DoubleQ(TDMethod):
 
     def __init__(self, env: ParametrizedEnv) -> None:
         super().__init__(env)
-        self.Q_2 = defaultdict(float)
+        self.Q_2: DefaultDict[tuple[int, int], float] = defaultdict(float)
 
     def update(self, episode: list[ReplayItem], step: int) -> None:
         if len(episode) <= 1:

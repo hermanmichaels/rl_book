@@ -44,7 +44,9 @@ class DPMethod(RLMethod):
         super().__init__(env)
         self.pi = pi
 
-    def act(self, state: int, step: int, mask: list[int] | None = None) -> int:
+    def act(
+        self, state: int, step: int | None = None, mask: np.ndarray | None = None
+    ) -> int:
         return self.pi[state]
 
 
@@ -72,7 +74,9 @@ def policy_iteration(env: ParametrizedEnv) -> DPMethod:
                 V[s] = sum(
                     [
                         p * (r + env.gamma * V[s_next])
-                        for p, s_next, r, _ in env.env.unwrapped.P[s][pi[s]]  # type: ignore
+                        for p, s_next, r, _ in env.env.unwrapped.P[s][
+                            pi[s]
+                        ]  # type: ignore
                     ]
                 )
                 delta = max(delta, abs(v - V[s]))
@@ -101,7 +105,7 @@ def policy_iteration(env: ParametrizedEnv) -> DPMethod:
             return DPMethod(env, pi)
 
 
-def value_iteration(env: ParametrizedEnv) -> tuple[bool, np.ndarray, int]:
+def value_iteration(env: ParametrizedEnv) -> DPMethod:
     """Uses 'Value Iteration' to solve the RL problem
     specified by the passed Gymnasium env.
 
@@ -133,8 +137,8 @@ def value_iteration(env: ParametrizedEnv) -> tuple[bool, np.ndarray, int]:
         V,
         env.get_observation_space_len(),
         env.get_action_space_len(),
-        env.env.unwrapped.P,
-        env.gamma,  # type: ignore
+        env.env.unwrapped.P,  # type: ignore
+        env.gamma,
     )
 
     return DPMethod(env, pi)

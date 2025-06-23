@@ -1,5 +1,6 @@
 import copy
 from collections import defaultdict
+from typing import DefaultDict
 
 import numpy as np
 
@@ -11,8 +12,8 @@ from rl_book.replay_utils import ReplayItem
 class MCMethod(RLMethod):
     def __init__(self, env: ParametrizedEnv) -> None:
         super().__init__(env)
-        self.Q = defaultdict(float)
-        self.pi = defaultdict(lambda: 1.0)
+        self.Q: DefaultDict[tuple[int, int], float] = defaultdict(float)
+        self.pi: DefaultDict[tuple[int, int], float] = defaultdict(lambda: 1.0)
 
     def clone(self):
         cloned = super().clone()
@@ -20,17 +21,17 @@ class MCMethod(RLMethod):
         return cloned
 
     def act(
-        self, state: int, step: int | None = None, mask: list[int] | None = None
+        self, state: int, step: int | None = None, mask: np.ndarray | None = None
     ) -> int:
         actions = self.get_allowed_actions(mask)
-        probs = [self.pi[state, a] for a in actions]
+        probs_arr = [self.pi[state, a] for a in actions]
 
         if self._train:
-            probs = np.exp(probs - np.max(probs))
+            probs = np.exp(probs_arr - np.max(probs_arr))
             probs /= sum(probs)
             return np.random.choice(actions, p=probs)
         else:
-            return actions[np.argmax(probs)]
+            return actions[np.argmax(probs_arr)]
 
 
 class OnPolicyMC(MCMethod):
