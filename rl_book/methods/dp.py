@@ -74,9 +74,9 @@ def policy_iteration(env: ParametrizedEnv) -> DPMethod:
                 V[s] = sum(
                     [
                         p * (r + env.gamma * V[s_next])
-                        for p, s_next, r, _ in env.env.unwrapped.P[s][
+                        for p, s_next, r, _ in env.env.unwrapped.P[s][  # type: ignore
                             pi[s]
-                        ]  # type: ignore
+                        ]
                     ]
                 )
                 delta = max(delta, abs(v - V[s]))

@@ -67,7 +67,7 @@ def train_multi_player(
     methods: list[MethodWithStats],
     zoo: list[MethodWithStats],
     max_steps: int = 100,
-    zoo_update_interval: int = 50,
+    zoo_update_interval: int = 500,
     zoo_size: int = 50,
     plot_interval: int | None = None,
 ) -> None:
@@ -80,7 +80,7 @@ def train_multi_player(
         max_steps: maixmal number of update steps
     """
     # For plotting: keep (step, win_ratio) tuples for every method at different steps.
-    win_ratios = [[] for method in methods]
+    win_ratios: list[list[tuple[int, float]]] = [[] for method in methods]
 
     for step in range(max_steps):
         env.env.reset()
@@ -145,9 +145,9 @@ def train_multi_player(
             ):
                 s, a, mask = state_dict[env.players[player_pos]]
 
-                observation_new = env.env.observe(
+                observation_new = env.env.observe(  # type: ignore
                     env.players[player_pos]
-                )  # type: ignore
+                )
 
                 episode.append(ReplayItem(s, a, reward, mask))
 

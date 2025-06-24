@@ -42,7 +42,7 @@ def benchmark_multi_player(env_name: str, load_weights: bool) -> None:
     ]
     zoo = [MethodWithStats(Random(env))]
     # Train given methods
-    train_multi_player(env, methods, zoo, max_steps=100000, plot_interval=1000)
+    train_multi_player(env, methods, zoo, max_steps=10000000, plot_interval=1000)
 
     # Now give user chance to play against one of the methods
     # TOOD: need good wrapper from action to input
@@ -55,6 +55,6 @@ if __name__ == "__main__":
         description="Benchmark RL methods in multi-player setup"
     )
     parser.add_argument("--env", type=str, required=True, help="Env")
-    parser.add_argument('--load', action='store_true')
+    parser.add_argument("--load", action="store_true")
     args = parser.parse_args()
     benchmark_multi_player(args.env, args.load)

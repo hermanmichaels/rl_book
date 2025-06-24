@@ -20,6 +20,7 @@ def grid_world_env() -> GridWorldEnv:
 def tic_tac_toe_env() -> TicTacToeEnv:
     return TicTacToeEnv(tictactoe_v3.env(), 0.99)
 
+
 @pytest.fixture
 def connect_four_env() -> ConnectFourEnv:
     return ConnectFourEnv(connect_four_v3.env(), 0.99)

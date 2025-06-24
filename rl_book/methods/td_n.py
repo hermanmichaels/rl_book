@@ -11,7 +11,9 @@ ALPHA = 0.1
 
 
 class SarsaN(TDMethod):
-    def __init__(self, env: ParametrizedEnv, load_weights: bool = False, n: int = 3) -> None:
+    def __init__(
+        self, env: ParametrizedEnv, load_weights: bool = False, n: int = 3
+    ) -> None:
         super().__init__(env, load_weights)
         self.n = n
 
@@ -58,7 +60,7 @@ class SarsaN(TDMethod):
 
 
 class TreeN(TDMethod):
-    def __init__(self, env: ParametrizedEnv, load_weights: bool, n: int = 3):
+    def __init__(self, env: ParametrizedEnv, load_weights: bool = False, n: int = 3):
         super().__init__(env, load_weights)
         self.Q = defaultdict(ConstantFactory(0.1))
         self.n = n

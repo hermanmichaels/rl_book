@@ -28,8 +28,10 @@ class ReplayBuffer:
     def sample(self) -> tuple[int, int]:
         return self.replay_buffer[random.randint(0, len(self.replay_buffer) - 1)]
 
+
 def model_factory():
     return 0, 0.0, 0
+
 
 class DynaQ(RLMethod):
     def __init__(
@@ -43,9 +45,9 @@ class DynaQ(RLMethod):
         self.Q: DefaultDict[tuple[int, int], float] = defaultdict(float)
         self.n = n
         self.buffer = ReplayBuffer()
-        self.model: DefaultDict[tuple[int, int], tuple[int, float, int]] = defaultdict(
-            model_factory
-        )
+        self.model: DefaultDict[
+            tuple[int, int], tuple[int, float, int, np.ndarray | None]
+        ] = defaultdict(model_factory)
         self.plus_mode = plus_mode
 
     def get_name(self) -> str:
@@ -97,20 +99,19 @@ class DynaQ(RLMethod):
             next_state.state,
             cur_state.reward,
             step,
-            next_state.mask
+            next_state.mask,
         )
 
         for _ in range(self.n):
             observation, action = self.buffer.sample()
-            observation_new_sampled, reward, t_last, mask = self.model[observation, action]
+            observation_new_sampled, reward, t_last, mask = self.model[
+                observation, action
+            ]
             bonus_reward = kappa * np.sqrt(step - t_last) if self.plus_mode else 0.0
 
             allowed_actions = self.get_allowed_actions(mask)
             next_q = max(
-                [
-                    self.Q[observation_new_sampled, a_]
-                    for a_ in allowed_actions
-                ],
+                [self.Q[observation_new_sampled, a_] for a_ in allowed_actions],
                 default=0,
             )
 
@@ -122,9 +123,9 @@ class DynaQ(RLMethod):
 
     def _get_save_data(self) -> Any:
         return self.Q, self.model
-    
+
     def _load_weights(self, save_path: str) -> None:
-        with open(save_path, 'rb') as f:
+        with open(save_path, "rb") as f:
             self.Q, self.model = pickle.load(f)
 
     # TODO: seemed essential for dyna-q, why?

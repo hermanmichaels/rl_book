@@ -34,12 +34,12 @@ class TDMethod(RLMethod):
             max_q = max(q_values)
             max_actions = [a for a, q in zip(allowed_actions, q_values) if q == max_q]
             return random.choice(max_actions)
-        
+
     def _get_save_data(self) -> Any:
         return self.Q
-    
+
     def _load_weights(self, save_path: str) -> None:
-        with open(save_path, 'rb') as f:
+        with open(save_path, "rb") as f:
             self.Q = pickle.load(f)
 
 
@@ -182,7 +182,7 @@ class DoubleQ(TDMethod):
 
     def _get_save_data(self) -> Any:
         return self.Q, self.Q_2
-    
+
     def _load_weights(self, save_path: str) -> None:
-        with open(save_path, 'rb') as f:
+        with open(save_path, "rb") as f:
             self.Q, self.Q_2 = pickle.load(f)

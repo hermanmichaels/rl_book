@@ -2,7 +2,7 @@ from typing import Callable
 
 import pytest
 
-from rl_book.env import ConnectFourEnv, GridWorldEnv, ParametrizedEnv, TicTacToeEnv
+from rl_book.env import ConnectFourEnv, GridWorldEnv, TicTacToeEnv
 from rl_book.methods.dp import policy_iteration, value_iteration
 from rl_book.methods.mc import OffPolicyMC, OnPolicyMC
 from rl_book.methods.method import MethodWithStats
@@ -39,13 +39,20 @@ def test_methods_grid_world(grid_world_env: GridWorldEnv, method_name: Callable)
     train_single_player(grid_world_env, method)[1]
 
 
-@pytest.mark.parametrize("method_name", [OnPolicyMC, OffPolicyMC, Sarsa, QLearning, ExpectedSarsa, SarsaN, TreeN])
+@pytest.mark.parametrize(
+    "method_name",
+    [OnPolicyMC, OffPolicyMC, Sarsa, QLearning, ExpectedSarsa, SarsaN, TreeN],
+)
 def test_methods_tic_tac_toe(tic_tac_toe_env: TicTacToeEnv, method_name: Callable):
     zoo = [MethodWithStats(Random(tic_tac_toe_env))]
     methods = [MethodWithStats(method_name(tic_tac_toe_env))]
     train_multi_player(tic_tac_toe_env, methods, zoo, max_steps=100)
 
-@pytest.mark.parametrize("method_name", [OnPolicyMC, OffPolicyMC, Sarsa, QLearning, ExpectedSarsa, SarsaN, TreeN])
+
+@pytest.mark.parametrize(
+    "method_name",
+    [OnPolicyMC, OffPolicyMC, Sarsa, QLearning, ExpectedSarsa, SarsaN, TreeN],
+)
 def test_methods_connect_four(connect_four_env: ConnectFourEnv, method_name: Callable):
     zoo = [MethodWithStats(Random(connect_four_env))]
     methods = [MethodWithStats(method_name(connect_four_env))]
