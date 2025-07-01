@@ -102,6 +102,9 @@ class GridWorldEnv(ParametrizedEnv):
     def get_observation_space_len(self) -> int:
         assert isinstance(self.env.observation_space, Discrete)
         return int(self.env.observation_space.n)
+    
+    def get_max_num_steps(self) -> int:
+        return self.env.observation_space.n * 4
 
 
 class GameResult(Enum):
@@ -227,9 +230,3 @@ class ConnectFourEnv(MultiPlayerEnv):
         return (
             "Please indicate in which column in which to drop the next token (0 - 6):"
         )
-
-    # def step(self, action: int) -> tuple[int, float, bool, bool, dict]:
-    #     # TODO: include in env?
-    #     observation, reward, terminated, truncated, info = self.env.step(action)
-    #     reward += 0.1
-    #     return observation, reward, terminated, truncated, info

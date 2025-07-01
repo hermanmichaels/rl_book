@@ -9,24 +9,27 @@ RESET = "\033[0m"
 BOLD = "\033[1m"
 
 
-def log_methods(methods: list[MethodWithStats], step: int) -> None:
+def log_methods(methods: list, step: int):
     sorted_methods = sorted(methods, key=lambda x: -x.get_win_ratio())
     max_name_len = max(len(m.method.get_name()) for m in methods)
-    separator = "-" * (max_name_len) + "|" + ("-" * 26)
+    separator = "-" * max_name_len + "|" + "-" * 26
 
-    if step == 0:
-        title = f"{BOLD}=== Method Stats at Step {step} ==={RESET}"
-        legend = (
-            f"{'Method '.ljust(max_name_len)}| {GREEN} Wins{RESET}"
-            f"/ {YELLOW} Draws{RESET} / {RED} Losses{RESET}"
-        )
-        print(title)
-        print(legend)
-        print(separator)
-        for i in range(len(methods)):
-            print(f"row {i}| initializing...")
+    header_lines = 3
+    method_lines = len(methods)
+    total_lines = header_lines + method_lines
 
-    sys.stdout.write(f"\033[{len(methods)}A")
+    if step > 0:
+        sys.stdout.write(f"\033[{total_lines}A")
+
+    title = f"{BOLD}=== Method Stats at Step {step} ==={RESET}"
+    legend = (
+        f"{'Method'.ljust(max_name_len)}| {GREEN}Wins{RESET} "
+        f"/ {YELLOW}Draws{RESET} / {RED}Losses{RESET}"
+    )
+
+    sys.stdout.write(f"\033[K{title}\n")
+    sys.stdout.write(f"\033[K{legend}\n")
+    sys.stdout.write(f"\033[K{separator}\n")
 
     for method in sorted_methods:
         name = method.method.get_name().ljust(max_name_len)
@@ -40,7 +43,6 @@ def log_methods(methods: list[MethodWithStats], step: int) -> None:
             f"{YELLOW}{draw}{RESET} / "
             f"{RED}{loss}{RESET}\n"
         )
-
         sys.stdout.write(line)
 
     sys.stdout.flush()

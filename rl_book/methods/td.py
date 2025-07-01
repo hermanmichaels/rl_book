@@ -54,12 +54,11 @@ class Sarsa(TDMethod):
         prev_state = episode[len(episode) - 2]
         cur_state = episode[len(episode) - 1]
 
-        q_next = self.Q[cur_state.state, cur_state.action]
         self.Q[prev_state.state, prev_state.action] = self.Q[
             prev_state.state, prev_state.action
         ] + ALPHA * (
             float(prev_state.reward)
-            + self.env.gamma * q_next
+            + self.env.gamma * self.Q[cur_state.state, cur_state.action]
             - self.Q[prev_state.state, prev_state.action]
         )
 
@@ -78,7 +77,7 @@ class QLearning(TDMethod):
         cur_state = episode[len(episode) - 2]
         next_state = episode[len(episode) - 1]
 
-        allowed_actions = self.get_allowed_actions(cur_state.mask)  # todo: not mask?
+        allowed_actions = self.get_allowed_actions(cur_state.mask)
         next_q = max(
             [self.Q[next_state.state, a_] for a_ in allowed_actions],
             default=0,

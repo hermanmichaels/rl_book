@@ -15,7 +15,7 @@ class MCMethod(RLMethod):
     def __init__(self, env: ParametrizedEnv, load_weights: bool = False) -> None:
         super().__init__(env, load_weights)
         self.Q: DefaultDict[tuple[int, int], float] = defaultdict(float)
-        self.pi: DefaultDict[tuple[int, int], float] = defaultdict(ConstantFactory(1.0))
+        self.pi: DefaultDict[tuple[int, int], float] = defaultdict(ConstantFactory(1.0 / self.env.get_action_space_len()))
 
     def clone(self):
         cloned = super().clone()
@@ -27,11 +27,12 @@ class MCMethod(RLMethod):
     ) -> int:
         actions = self.get_allowed_actions(mask)
         probs_arr = [self.pi[state, a] for a in actions]
+        # Masked actions can cause sum(probs_arr) to be less than 1, causing
+        # random.choice to crash
+        probs_arr = np.asarray(probs_arr) / sum(probs_arr)
 
         if self._train:
-            probs = np.exp(probs_arr - np.max(probs_arr))
-            probs /= sum(probs)
-            return np.random.choice(actions, p=probs)
+            return np.random.choice(actions, p=probs_arr)
         else:
             return actions[np.argmax(probs_arr)]
 
@@ -106,7 +107,7 @@ class OffPolicyMC(MCMethod):
             best_action = np.argmax(qs)
 
             for a in range(n_actions):
-                self.pi[s, a] = 1 - eps if a == best_action else eps
+                self.pi[s, a] = 1 - eps if a == best_action else eps / (n_actions - 1)
 
     def finalize(self, episode, step):
         # Note: self.pi is here used as the behavior policy b, while the target policy π

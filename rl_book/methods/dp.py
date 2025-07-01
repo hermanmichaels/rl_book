@@ -60,7 +60,7 @@ def policy_iteration(env: ParametrizedEnv) -> DPMethod:
     Returns:
         found method
     """
-    pi = np.zeros(env.get_observation_space_len()).astype(np.int32)  # TODO: needed?
+    pi = np.zeros(env.get_observation_space_len()).astype(np.int32)
 
     def _policy_evaluation() -> np.ndarray:
         """Run's policy evaluation - i.e. evaluates the current

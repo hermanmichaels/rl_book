@@ -128,7 +128,6 @@ class DynaQ(RLMethod):
         with open(save_path, "rb") as f:
             self.Q, self.model = pickle.load(f)
 
-    # TODO: seemed essential for dyna-q, why?
     def finalize(self, episode: list[ReplayItem], step: int) -> None:
         self.update(episode, step)
 

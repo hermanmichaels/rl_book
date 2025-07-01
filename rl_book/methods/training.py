@@ -32,7 +32,7 @@ def train_single_player(
         terminated = truncated = False
 
         episode = []
-        cur_episode_len = 0  # TODO: change depending on size!!!
+        cur_episode_len = 0
 
         while not terminated and not truncated:
             action = method.act(observation, step)
@@ -46,12 +46,12 @@ def train_single_player(
 
             observation = observation_new
 
-            # TODO: dangerous!
+            # NOTE: this is highly dependent on environment size
             cur_episode_len += 1
-            if cur_episode_len > 100:
+            if cur_episode_len > env.get_max_num_steps():
                 break
 
-        episode.append(ReplayItem(observation_new, -1, reward, None))  # why? sarsa?
+        episode.append(ReplayItem(observation_new, -1, reward, []))
         method.finalize(episode, step)
 
         if callback and callback(method, step):
@@ -111,7 +111,7 @@ def train_multi_player(
             ) = env.env.last()  # type: ignore
 
             done = termination or truncation
-
+    
             if done:
                 action = None
                 # Game over, rewards contains all playerss
@@ -137,7 +137,6 @@ def train_multi_player(
             env.env.step(action)
 
             _, reward, _, _, _ = env.env.last()  # type: ignore
-            reward += 0.1  # TODO
 
             if (
                 env.env.agent_selection == env.players[player_pos]  # type: ignore
@@ -160,7 +159,7 @@ def train_multi_player(
                 ),  # type: ignore
                 -1,
                 0,
-                None,  # TODO: needed?
+                [],
             )
         )
 
@@ -177,6 +176,8 @@ def train_multi_player(
                 plt.plot(x, y, label=method.method.get_name())
 
             plt.legend()
+            plt.xlabel("Step")
+            plt.ylabel("Win %")
             plt.savefig("wins.png")
 
             log_methods(methods, step)
