@@ -1,166 +1,186 @@
+import copy
+import pickle
 import random
-from typing import Callable
+from collections import defaultdict
+from typing import Any, DefaultDict
 
 import numpy as np
 
 from rl_book.env import ParametrizedEnv
-from rl_book.gym_utils import get_observation_action_space
-from rl_book.methods.method_wrapper import with_default_values
-from rl_book.utils import get_eps_greedy_action, get_policy
+from rl_book.methods.method import RLMethod
+from rl_book.replay_utils import ReplayItem
 
 ALPHA = 0.1
 
 
-@with_default_values
-def sarsa(
-    env: ParametrizedEnv, success_cb: Callable[[np.ndarray, int], bool], max_steps: int
-) -> tuple[bool, np.ndarray, int]:
-    observation_space, action_space = get_observation_action_space(env)
-    Q = np.zeros((observation_space.n, action_space.n))
+class TDMethod(RLMethod):
+    def __init__(self, env: ParametrizedEnv, load_weights: bool = False) -> None:
+        super().__init__(env, load_weights)
+        self.Q: DefaultDict[tuple[int, int], float] = defaultdict(float)
 
-    for step in range(max_steps):
-        observation, _ = env.env.reset()
-        terminated = truncated = False
+    def clone(self) -> "TDMethod":
+        cloned = self.__class__(self.env, False)
+        cloned.Q = copy.deepcopy(self.Q)
+        return cloned
 
-        eps = env.eps(step)
+    def act(
+        self, state: int, step: int | None = None, mask: np.ndarray | list = []
+    ) -> int:
+        allowed_actions = self.get_allowed_actions(mask)
+        if self._train and step and random.uniform(0, 1) < self.env.eps(step):
+            return random.choice(allowed_actions)
+        else:
+            q_values = [self.Q[state, a] for a in allowed_actions]
+            max_q = max(q_values)
+            max_actions = [a for a, q in zip(allowed_actions, q_values) if q == max_q]
+            return random.choice(max_actions)
 
-        action = get_eps_greedy_action(Q[observation], eps)
+    def _get_save_data(self) -> Any:
+        return self.Q
 
-        while not terminated and not truncated:
-            observation_new, reward, terminated, truncated, _ = env.step(
-                action, observation
-            )
-            action_new = get_eps_greedy_action(Q[observation_new], eps)
-            q_next = Q[observation_new, action_new] if not terminated else 0
-            Q[observation, action] = Q[observation, action] + ALPHA * (
-                float(reward) + env.gamma * q_next - Q[observation, action]
-            )
-            observation = observation_new
-            action = action_new
-
-        pi = get_policy(Q, observation_space)
-        if success_cb(pi, step):
-            return True, pi, step
-
-    return False, get_policy(Q, observation_space), step
+    def _load_weights(self, save_path: str) -> None:
+        with open(save_path, "rb") as f:
+            self.Q = pickle.load(f)
 
 
-@with_default_values
-def q(
-    env, success_cb: Callable[[np.ndarray, int], bool], max_steps: int
-) -> tuple[bool, np.ndarray, int]:
-    observation_space, action_space = get_observation_action_space(env)
-    Q = np.zeros((observation_space.n, action_space.n))
+class Sarsa(TDMethod):
+    def get_name(self) -> str:
+        return "Sarsa"
 
-    for step in range(max_steps):
-        observation, _ = env.env.reset()
-        terminated = truncated = False
+    def update(self, episode: list[ReplayItem], step: int) -> None:
+        if len(episode) <= 1:
+            return
 
-        cur_episode_len = 0
+        prev_state = episode[len(episode) - 2]
+        cur_state = episode[len(episode) - 1]
 
-        while not terminated and not truncated:
-            action = get_eps_greedy_action(Q[observation], env.eps(step))
-            observation_new, reward, terminated, truncated, _ = env.step(
-                action, observation
-            )
-
-            Q[observation, action] = Q[observation, action] + ALPHA * (
-                reward + env.gamma * np.max(Q[observation_new]) - Q[observation, action]
-            )
-            observation = observation_new
-
-            cur_episode_len += 1
-            if cur_episode_len > 400:
-                break
-
-        pi = get_policy(Q, observation_space)
-        if success_cb(pi, step):
-            return True, pi, step
-
-    return False, get_policy(Q, observation_space), step
-
-
-@with_default_values
-def expected_sarsa(
-    env: ParametrizedEnv, success_cb: Callable[[np.ndarray, int], bool], max_steps: int
-) -> tuple[bool, np.ndarray, int]:
-    observation_space, action_space = get_observation_action_space(env)
-    Q = np.zeros((observation_space.n, action_space.n))
-
-    def _get_action_prob(Q: np.ndarray) -> float:
-        return (
-            Q[observation_new, a] / sum(Q[observation_new, :])
-            if sum(Q[observation_new, :])
-            else 1
+        self.Q[prev_state.state, prev_state.action] = self.Q[
+            prev_state.state, prev_state.action
+        ] + ALPHA * (
+            float(prev_state.reward)
+            + self.env.gamma * self.Q[cur_state.state, cur_state.action]
+            - self.Q[prev_state.state, prev_state.action]
         )
 
-    for step in range(max_steps):
-        observation, _ = env.env.reset()
-        terminated = truncated = False
-        action = get_eps_greedy_action(Q[observation])
+    def finalize(self, episode: list[ReplayItem], step: int) -> None:
+        self.update(episode, step)
 
-        cur_episode_len = 0
 
-        while not terminated and not truncated:
-            observation_new, reward, terminated, truncated, _ = env.step(
-                action, observation
+class QLearning(TDMethod):
+    def get_name(self) -> str:
+        return "QLearning"
+
+    def update(self, episode: list[ReplayItem], step: int) -> None:
+        if len(episode) <= 1:
+            return
+
+        cur_state = episode[len(episode) - 2]
+        next_state = episode[len(episode) - 1]
+
+        allowed_actions = self.get_allowed_actions(cur_state.mask)
+        next_q = max(
+            [self.Q[next_state.state, a_] for a_ in allowed_actions],
+            default=0,
+        )
+
+        self.Q[cur_state.state, cur_state.action] = self.Q[
+            cur_state.state, cur_state.action
+        ] + ALPHA * (
+            cur_state.reward
+            + self.env.gamma * next_q
+            - self.Q[cur_state.state, cur_state.action]
+        )
+
+    def finalize(self, episode: list[ReplayItem], step: int) -> None:
+        self.update(episode, step)
+
+
+class ExpectedSarsa(TDMethod):
+    def get_name(self) -> str:
+        return "ExpectedSarsa"
+
+    def _get_action_prob(self, observation: int, action: int) -> float:
+        probs = [self.Q[observation, a] for a in range(self.env.get_action_space_len())]
+        probs = np.exp(probs - np.max(probs))
+        return probs[action] / sum(probs)
+
+    def update(self, episode: list[ReplayItem], step: int) -> None:
+        if len(episode) <= 1:
+            return
+
+        cur_state = episode[len(episode) - 2]
+        next_state = episode[len(episode) - 1]
+
+        updated_q_value = self.Q[cur_state.state, cur_state.action] + ALPHA * (
+            cur_state.reward - self.Q[cur_state.state, cur_state.action]
+        )
+
+        actions = self.get_allowed_actions(next_state.mask)
+
+        for a in actions:
+            updated_q_value += (
+                self.env.gamma
+                * ALPHA
+                * self._get_action_prob(next_state.state, a)
+                * self.Q[next_state.state, a]
             )
-            action_new = get_eps_greedy_action(Q[observation_new])
-            updated_q_value = Q[observation, action] + ALPHA * (
-                reward - Q[observation, action]
-            )
-            for a in range(action_space.n):
-                updated_q_value += ALPHA * _get_action_prob(Q) * Q[observation_new, a]
-            Q[observation, action] = updated_q_value
-            observation = observation_new
-            action = action_new
 
-        pi = get_policy(Q, observation_space)
-        if success_cb(pi, step):
-            return True, pi, step
+        self.Q[cur_state.state, cur_state.action] = updated_q_value
 
-        cur_episode_len += 1
-        if cur_episode_len > 100:
-            break
-
-    return False, get_policy(Q, observation_space), step
+    def finalize(self, episode: list[ReplayItem], step: int) -> None:
+        self.update(episode, step)
 
 
-@with_default_values
-def double_q(
-    env, success_cb: Callable[[np.ndarray, int], bool], max_steps: int
-) -> tuple[bool, np.ndarray, int]:
-    observation_space, action_space = get_observation_action_space(env)
-    Q_1 = np.zeros((observation_space.n, action_space.n))
-    Q_2 = np.zeros((observation_space.n, action_space.n))
+class DoubleQ(TDMethod):
+    def get_name(self) -> str:
+        return "DoubleQ"
 
-    for step in range(max_steps):
-        observation, _ = env.env.reset()
+    def __init__(self, env: ParametrizedEnv, load_weights: bool = False) -> None:
+        super().__init__(env, load_weights)
+        self.Q_2: DefaultDict[tuple[int, int], float] = defaultdict(float)
 
-        terminated = truncated = False
+    def update(self, episode: list[ReplayItem], step: int) -> None:
+        if len(episode) <= 1:
+            return
 
-        while not terminated and not truncated:
-            action = get_eps_greedy_action(Q_1[observation], env.eps(step))
-            observation_new, reward, terminated, truncated, _ = env.step(
-                action, observation
-            )
+        cur_state = episode[len(episode) - 2]
+        next_state = episode[len(episode) - 1]
 
-            if random.randint(0, 100) < 50:
-                Q_1[observation, action] = Q_1[observation, action] + ALPHA * (
-                    reward
-                    + env.gamma * Q_2[observation_new, np.argmax(Q_1[observation_new])]
-                    - Q_1[observation, action]
+        allowed_actions = self.get_allowed_actions(cur_state.mask)
+
+        if random.randint(0, 100) < 50:
+            max_a = allowed_actions[
+                np.argmax(
+                    [self.Q[next_state.state, a] for a in allowed_actions],
                 )
-            else:
-                Q_2[observation, action] = Q_2[observation, action] + ALPHA * (
-                    reward
-                    + env.gamma * Q_1[observation_new, np.argmax(Q_2[observation_new])]
-                    - Q_2[observation, action]
+            ]
+            self.Q[cur_state.state, cur_state.action] = self.Q[
+                cur_state.state, cur_state.action
+            ] + ALPHA * (
+                cur_state.reward
+                + self.env.gamma * self.Q_2[next_state.state, max_a]
+                - self.Q[cur_state.state, cur_state.action]
+            )
+        else:
+            max_a = allowed_actions[
+                np.argmax(
+                    [self.Q_2[next_state.state, a] for a in allowed_actions],
                 )
-            observation = observation_new
+            ]
+            self.Q_2[cur_state.state, cur_state.action] = self.Q_2[
+                cur_state.state, cur_state.action
+            ] + ALPHA * (
+                cur_state.reward
+                + self.env.gamma * self.Q[next_state.state, max_a]
+                - self.Q_2[cur_state.state, cur_state.action]
+            )
 
-        pi = get_policy(Q_1, observation_space)
-        if success_cb(pi, step):
-            return True, pi, step
+    def finalize(self, episode: list[ReplayItem], step: int) -> None:
+        self.update(episode, step)
 
-    return False, get_policy(Q_1, observation_space), step
+    def _get_save_data(self) -> Any:
+        return self.Q, self.Q_2
+
+    def _load_weights(self, save_path: str) -> None:
+        with open(save_path, "rb") as f:
+            self.Q, self.Q_2 = pickle.load(f)

@@ -4,16 +4,16 @@ from typing import Callable
 
 import gymnasium as gym
 import matplotlib.pyplot as plt
-import numpy as np
 from gymnasium.core import Env
 from gymnasium.envs.toy_text.frozen_lake import generate_random_map
 
-from rl_book.env import ParametrizedEnv
-from rl_book.methods.dp import policy_iteration, value_iteration
-from rl_book.methods.mc import mc_es, off_policy_mc, on_policy_mc
-from rl_book.methods.planning import dyna_q, prioritized_sweeping
-from rl_book.methods.td import double_q, expected_sarsa, q, sarsa
-from rl_book.methods.td_n import sarsa_n, tree_n
+from rl_book.env import GridWorldEnv
+from rl_book.methods.mc import OffPolicyMC, OnPolicyMC
+from rl_book.methods.method import RLMethod
+from rl_book.methods.planning import DynaQ
+from rl_book.methods.td import DoubleQ, ExpectedSarsa, QLearning, Sarsa
+from rl_book.methods.td_n import SarsaN, TreeN
+from rl_book.methods.training import train_single_player
 
 GAMMA = 0.97
 MAX_INFERENCE_STEPS = 1000
@@ -21,16 +21,14 @@ MAX_STEPS = [10000, 30000, 100000, 200000]
 TRIES_PER_STEP = 3
 
 
-def generate_random_env(
-    n: int, extra_rewards: bool, eps_decay: bool
-) -> ParametrizedEnv:
+def generate_random_env(n: int, extra_rewards: bool, eps_decay: bool) -> GridWorldEnv:
     desc = generate_random_map(size=n)
     gym_env = gym.make(
         "FrozenLake-v1",
         desc=desc,
         is_slippery=False,
     )
-    return ParametrizedEnv(
+    return GridWorldEnv(
         gym_env, GAMMA, intermediate_rewards=extra_rewards, eps_decay=eps_decay
     )
 
@@ -44,7 +42,7 @@ def get_check_frequency(step: int) -> int:
         return 10000
 
 
-def success_callback(pi: np.ndarray, step: int, env: Env) -> bool:
+def success_callback(method: RLMethod, step: int, env: Env) -> bool:
     """Tests whether the given policy can successfully solve the given Gridworld
     environment.
 
@@ -60,13 +58,17 @@ def success_callback(pi: np.ndarray, step: int, env: Env) -> bool:
     if step % get_check_frequency(step) != 0:
         return False
 
+    method.eval()
+
     observation, _ = env.reset()
     for _ in range(MAX_INFERENCE_STEPS):
-        action = pi[observation]
+        action = method.act(observation, step)
         observation, reward, terminated, truncated, _ = env.step(action)
         if terminated or truncated:
             break
     env.close()
+
+    method.train()
 
     return reward == 1
 
@@ -96,9 +98,9 @@ def plot_results(
 
 
 def benchmark(
-    methods: list[Callable],
-    min_grid_size=3,
-    max_grid_size=8,
+    methods: list,
+    min_grid_size=5,
+    max_grid_size=20,
     extra_rewards: bool = True,
     eps_decay: bool = True,
     fig_path: str = "result.png",
@@ -119,7 +121,7 @@ def benchmark(
     for n in range(min_grid_size, max_grid_size):
         start = time.time()
         # Iterate over all methods.
-        for idx, method in enumerate(methods):
+        for idx, method_ in enumerate(methods):
             # For faster results and reduced variance (e.g. unlucky initialization)
             # try increasing maximal number of steps, and run multiple trainings
             # with each threshold - then store the best run.
@@ -128,13 +130,14 @@ def benchmark(
                 steps_needed_cur: list[int] = []
                 for _ in range(TRIES_PER_STEP):
                     env = generate_random_env(n, extra_rewards, eps_decay)
+                    method = method_(env)
                     callback = partial(success_callback, env=env.env)
                     max_s = (
                         max_steps + 1
                         if not steps_needed_cur
                         else max(1, min(steps_needed_cur))
                     )
-                    success, _, step = method(env, callback, max_s)
+                    success, step = train_single_player(env, method, max_s, callback)
                     if success:
                         steps_needed_cur.append(step)
                 if steps_needed_cur:
@@ -153,14 +156,13 @@ def benchmark(
 
 
 if __name__ == "__main__":
-    benchmark([policy_iteration, value_iteration], fig_path="results/dp.png")
     benchmark(
-        [mc_es, on_policy_mc, off_policy_mc],
+        [OnPolicyMC, OffPolicyMC],
         fig_path="results/mc.png",
     )
-    benchmark([sarsa, q, expected_sarsa, double_q], fig_path="results/td.png")
-    benchmark([sarsa_n, tree_n], fig_path="results/td_n_.png")
+    benchmark([Sarsa, QLearning, ExpectedSarsa, DoubleQ], fig_path="results/td.png")
+    benchmark([SarsaN, TreeN], fig_path="results/td_n.png")
     benchmark(
-        [dyna_q, prioritized_sweeping],
+        [DynaQ],
         fig_path="results/planning.png",
     )

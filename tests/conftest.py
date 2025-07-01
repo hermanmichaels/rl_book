@@ -1,15 +1,26 @@
 import gymnasium as gym
 import pytest
+from pettingzoo.classic import connect_four_v3, tictactoe_v3
 
-from rl_book.env import ParametrizedEnv
+from rl_book.env import ConnectFourEnv, GridWorldEnv, TicTacToeEnv
 
 
 @pytest.fixture
-def env_train() -> ParametrizedEnv:
+def grid_world_env() -> GridWorldEnv:
     gym_env_train = gym.make(
         "FrozenLake-v1",
         desc=None,
         map_name="4x4",
         is_slippery=False,
     )
-    return ParametrizedEnv(gym_env_train, 0.99, 0.05)
+    return GridWorldEnv(gym_env_train, 0.99, False, False)
+
+
+@pytest.fixture
+def tic_tac_toe_env() -> TicTacToeEnv:
+    return TicTacToeEnv(tictactoe_v3.env(), 0.99)
+
+
+@pytest.fixture
+def connect_four_env() -> ConnectFourEnv:
+    return ConnectFourEnv(connect_four_v3.env(), 0.99)

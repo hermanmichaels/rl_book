@@ -1,19 +1,15 @@
-from typing import Callable
-
 import numpy as np
-from gymnasium.spaces import Discrete
 
 from rl_book.env import ParametrizedEnv
-from rl_book.gym_utils import get_observation_action_space
-from rl_book.methods.method_wrapper import with_default_values
+from rl_book.methods.method import RLMethod
 
 EPS = 0.05
 
 
 def extract_policy(
     V: np.ndarray,
-    observation_space: Discrete,
-    action_space: Discrete,
+    observation_space_len: int,
+    action_space_len: int,
     P: dict,
     gamma: float,
 ) -> np.ndarray:
@@ -34,19 +30,27 @@ def extract_policy(
             np.argmax(
                 [
                     p * (r + gamma * V[s_next])
-                    for a in range(action_space.n)
+                    for a in range(action_space_len)
                     for p, s_next, r, _ in P[s][a]  # type: ignore
                 ]
             )
-            for s in range(observation_space.n)
+            for s in range(observation_space_len)
         ]
     )
 
 
-@with_default_values
-def policy_iteration(
-    env: ParametrizedEnv, success_cb: Callable[[np.ndarray, int], bool], max_steps: int
-) -> tuple[bool, np.ndarray, int]:
+class DPMethod(RLMethod):
+    def __init__(self, env: ParametrizedEnv, pi: np.ndarray) -> None:
+        super().__init__(env)
+        self.pi = pi
+
+    def act(
+        self, state: int, step: int | None = None, mask: np.ndarray | list = []
+    ) -> int:
+        return self.pi[state]
+
+
+def policy_iteration(env: ParametrizedEnv) -> DPMethod:
     """Uses 'Policy Iteration' to solve the RL problem
     specified by the passed Gymnasium env.
 
@@ -54,25 +58,25 @@ def policy_iteration(
         env: env containing the problem
 
     Returns:
-        found policy
+        found method
     """
-    observation_space, action_space = get_observation_action_space(env)
-
-    pi = np.zeros(observation_space.n).astype(np.int32)
+    pi = np.zeros(env.get_observation_space_len()).astype(np.int32)
 
     def _policy_evaluation() -> np.ndarray:
         """Run's policy evaluation - i.e. evaluates the current
         policy pi, and updates the value estimate V.
         """
-        V = np.zeros(observation_space.n)
+        V = np.zeros(env.get_observation_space_len())
         while True:
             delta = 0
-            for s in range(observation_space.n):
+            for s in range(env.get_observation_space_len()):
                 v = V[s]
                 V[s] = sum(
                     [
                         p * (r + env.gamma * V[s_next])
-                        for p, s_next, r, _ in env.env.P[s][pi[s]]  # type: ignore
+                        for p, s_next, r, _ in env.env.unwrapped.P[s][  # type: ignore
+                            pi[s]
+                        ]
                     ]
                 )
                 delta = max(delta, abs(v - V[s]))
@@ -80,33 +84,28 @@ def policy_iteration(
                 break
         return V
 
-    for step in range(max_steps):
+    while True:
         V = _policy_evaluation()
 
-        for s in range(observation_space.n):
+        policy_stable = True
+        for s in range(env.get_observation_space_len()):
+            old_a = pi[s]
             pi[s] = np.argmax(
                 [
                     p * (r + env.gamma * V[s_next])
-                    for a in range(action_space.n)
-                    for p, s_next, r, _ in env.env.P[s][a]  # type: ignore
+                    for a in range(env.get_action_space_len())
+                    for p, s_next, r, _ in env.env.unwrapped.P[s][a]  # type: ignore
                 ]
             )
+            if old_a != pi[s]:
+                policy_stable = False
+                break
 
-        pi = extract_policy(
-            V, observation_space, action_space, env.env.P, env.gamma  # type: ignore
-        )
-        success = success_cb(pi, step)
-
-        if success:
-            return success, pi, step
-
-    return False, pi, step
+        if policy_stable:
+            return DPMethod(env, pi)
 
 
-@with_default_values
-def value_iteration(
-    env: ParametrizedEnv, success_cb: Callable[[np.ndarray, int], bool], max_steps: int
-) -> tuple[bool, np.ndarray, int]:
+def value_iteration(env: ParametrizedEnv) -> DPMethod:
     """Uses 'Value Iteration' to solve the RL problem
     specified by the passed Gymnasium env.
 
@@ -116,28 +115,30 @@ def value_iteration(
     Returns:
         found policy
     """
-    observation_space, action_space = get_observation_action_space(env)
+    V = np.zeros(env.get_observation_space_len())
 
-    V = np.zeros(observation_space.n)
-
-    for step in range(max_steps):
+    while True:
         delta = 0
-        for s in range(observation_space.n):
+        for s in range(env.get_observation_space_len()):
             v = V[s]
             V[s] = max(
                 [
                     p * (r + env.gamma * V[s_next])
-                    for a in range(action_space.n)
-                    for p, s_next, r, _ in env.env.P[s][a]  # type: ignore
+                    for a in range(env.get_action_space_len())
+                    for p, s_next, r, _ in env.env.unwrapped.P[s][a]  # type: ignore
                 ]
             )
             delta = max(delta, abs(v - V[s]))
 
-        pi = extract_policy(
-            V, observation_space, action_space, env.env.P, env.gamma  # type: ignore
-        )
-        success = success_cb(pi, step)
-        if success:
-            return success, pi, step
+        if delta < EPS:
+            break
 
-    return False, pi, step
+    pi = extract_policy(
+        V,
+        env.get_observation_space_len(),
+        env.get_action_space_len(),
+        env.env.unwrapped.P,  # type: ignore
+        env.gamma,
+    )
+
+    return DPMethod(env, pi)

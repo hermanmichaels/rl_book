@@ -1,19 +1,19 @@
-import heapq
+import copy
+import pickle
 import random
 from collections import defaultdict
-from typing import Callable, Optional
+from typing import Any, DefaultDict, Optional
 
 import numpy as np
 
 from rl_book.env import ParametrizedEnv
-from rl_book.gym_utils import get_observation_action_space
-from rl_book.methods.method_wrapper import with_default_values
-from rl_book.methods.td import ALPHA, get_eps_greedy_action
-from rl_book.utils import get_policy
+from rl_book.methods.method import RLMethod
+from rl_book.replay_utils import ReplayItem
 
 NUM_STEPS = 1000
 NUM_MCTS_ITERATIONS = 1000
 UCB_EXPLORATION_CONST = 0.01
+ALPHA = 0.1
 
 
 class ReplayBuffer:
@@ -28,137 +28,106 @@ class ReplayBuffer:
     def sample(self) -> tuple[int, int]:
         return self.replay_buffer[random.randint(0, len(self.replay_buffer) - 1)]
 
-@with_default_values
-def dyna_q(
-    env: ParametrizedEnv,
-    success_cb: Callable[[np.ndarray, int], bool],
-    max_steps: int,
-    n: int = 3,
-    plus_mode: bool = False,
-) -> tuple[bool, np.ndarray, int]:
-    observation_space, action_space = get_observation_action_space(env)
-    Q = np.zeros((observation_space.n, action_space.n))
-    model = np.zeros((observation_space.n, action_space.n, 3))
 
-    buffer = ReplayBuffer()
-    t = 0
-    kappa = 0
+def model_factory():
+    return 0, 0.0, 0
 
-    for step in range(max_steps):
-        observation, _ = env.env.reset()
-        terminated = truncated = False
-        action = get_eps_greedy_action(Q[observation], env.eps(step))
 
-        while not terminated and not truncated:
-            action = get_eps_greedy_action(Q[observation])
-            buffer.push(observation, action)
-            t += 1
+class DynaQ(RLMethod):
+    def __init__(
+        self,
+        env: ParametrizedEnv,
+        load_weights: bool = False,
+        n: int = 3,
+        plus_mode: bool = False,
+    ):
+        super().__init__(env, load_weights)
+        self.Q: DefaultDict[tuple[int, int], float] = defaultdict(float)
+        self.n = n
+        self.buffer = ReplayBuffer()
+        self.model: DefaultDict[
+            tuple[int, int], tuple[int, float, int, np.ndarray | list]
+        ] = defaultdict(model_factory)
+        self.plus_mode = plus_mode
 
-            observation_new, reward, terminated, truncated, _ = env.step(
-                action, observation
+    def get_name(self) -> str:
+        return "DynaQ"
+
+    def clone(self):
+        cloned = self.__class__(self.env, False, self.n, self.plus_mode)
+        cloned.Q = copy.deepcopy(self.Q)
+        return cloned
+
+    def act(self, state: int, step: int | None = None, mask: np.ndarray | list = []):
+        allowed_actions = self.get_allowed_actions(mask)
+        if self._train and step and random.uniform(0, 1) < self.env.eps(step):
+            return random.choice(allowed_actions)
+        else:
+            q_values = [self.Q[state, a] for a in allowed_actions]
+            max_q = max(q_values)
+            max_actions = [a for a, q in zip(allowed_actions, q_values) if q == max_q]
+            return random.choice(max_actions)
+
+    def update(self, episode: list[ReplayItem], step: int) -> None:
+        if len(episode) <= 1:
+            return
+
+        self.buffer.push(episode[-2].state, episode[-2].action)
+
+        kappa = 0.1
+
+        cur_state = episode[len(episode) - 2]
+        next_state = episode[len(episode) - 1]
+
+        allowed_actions = self.get_allowed_actions(cur_state.mask)
+        next_q = max(
+            [self.Q[next_state.state, a_] for a_ in allowed_actions],
+            default=0,
+        )
+
+        self.Q[cur_state.state, cur_state.action] = self.Q[
+            cur_state.state, cur_state.action
+        ] + ALPHA * (
+            cur_state.reward
+            + self.env.gamma * next_q
+            - self.Q[cur_state.state, cur_state.action]
+        )
+
+        self.model[cur_state.state, cur_state.action] = (
+            next_state.state,
+            cur_state.reward,
+            step,
+            next_state.mask,
+        )
+
+        for _ in range(self.n):
+            observation, action = self.buffer.sample()
+            observation_new_sampled, reward, t_last, mask = self.model[
+                observation, action
+            ]
+            bonus_reward = kappa * np.sqrt(step - t_last) if self.plus_mode else 0.0
+
+            allowed_actions = self.get_allowed_actions(mask)
+            next_q = max(
+                [self.Q[observation_new_sampled, a_] for a_ in allowed_actions],
+                default=0,
             )
-            Q[observation, action] = Q[observation, action] + ALPHA * (
-                float(reward)
-                + env.gamma * np.max(Q[observation_new])
-                - Q[observation, action]
+
+            self.Q[observation, action] = self.Q[observation, action] + ALPHA * (
+                (float(reward) + bonus_reward)
+                + self.env.gamma * next_q
+                - self.Q[observation, action]
             )
-            model[observation, action] = observation_new, reward, t
 
-            for _ in range(n):
-                observation, action = buffer.sample()
-                observation_new_sampled, reward, t_last = model[observation, action]
-                bonus_reward = kappa * np.sqrt(t - t_last) if plus_mode else 0.0
-                Q[observation, action] = Q[observation, action] + ALPHA * (
-                    (float(reward) + bonus_reward)
-                    + env.gamma * np.max(Q[int(observation_new_sampled)])
-                    - Q[observation, action]
-                )
+    def _get_save_data(self) -> Any:
+        return self.Q, self.model
 
-            observation = observation_new
+    def _load_weights(self, save_path: str) -> None:
+        with open(save_path, "rb") as f:
+            self.Q, self.model = pickle.load(f)
 
-        pi = get_policy(Q, observation_space)
-        if success_cb(pi, step):
-            return True, pi, step
-
-    return False, get_policy(Q, observation_space), step
-
-
-def generate_predecessor_states(
-    env: ParametrizedEnv,
-) -> dict[int, set[tuple[int, int]]]:
-    """Generates a dictionary of predecessor states.
-
-    Args:
-        env: env to use
-
-    Returns:
-        dict[state] containing all (s, a) tuples leading into state
-    """
-    observation_space, action_space = get_observation_action_space(env)
-    predecessors = defaultdict(set)
-
-    for state in range(observation_space.n):
-        for action in range(action_space.n):
-            _, next_state, _, _ = env.env.P[state][action][0]  # type: ignore
-            predecessors[next_state].add((state, action))
-
-    return predecessors
-
-@with_default_values
-def prioritized_sweeping(
-    env: ParametrizedEnv, success_cb: Callable[[np.ndarray, int], bool], max_steps: int
-) -> tuple[bool, np.ndarray, int]:
-    observation_space, action_space = get_observation_action_space(env)
-    Q = np.zeros((observation_space.n, action_space.n))
-    model = np.zeros((observation_space.n, action_space.n, 2))
-    p_queue: list[tuple[float, tuple[int, int]]] = []
-    theta = 0.1
-    predecessors = generate_predecessor_states(env)
-
-    n = 3
-
-    for step in range(max_steps):
-        observation, _ = env.env.reset()
-        terminated = truncated = False
-        action = get_eps_greedy_action(Q[observation], env.eps(step))
-
-        while not terminated and not truncated:
-            action = get_eps_greedy_action(Q[observation], env.eps(step))
-            observation_new, reward, terminated, truncated, _ = env.step(
-                action, observation
-            )
-            model[observation, action] = observation_new, reward
-            P = abs(
-                reward + env.gamma * max(Q[observation_new]) - Q[observation, action]
-            )
-            if P > theta:
-                heapq.heappush(p_queue, (-P, (observation, action)))
-
-            for _ in range(n):
-                if not p_queue:
-                    break
-
-                _, (observation, action) = heapq.heappop(p_queue)
-                observation_new_sampled, reward = model[observation, action]
-                Q[observation, action] = Q[observation, action] + ALPHA * (
-                    reward
-                    + env.gamma * np.max(Q[int(observation_new_sampled)])
-                    - Q[observation, action]
-                )
-
-                for s_bar, a_bar in predecessors[observation]:
-                    _, reward = model[s_bar, a_bar]
-                    P = abs(reward + env.gamma * max(Q[observation]) - Q[s_bar, a_bar])
-                    if P > theta:
-                        heapq.heappush(p_queue, (-P, (s_bar, a_bar)))
-
-            observation = observation_new
-
-    pi = get_policy(Q, observation_space)
-    if success_cb(pi, step):
-        return True, pi, step
-
-    return False, get_policy(Q, observation_space), step
+    def finalize(self, episode: list[ReplayItem], step: int) -> None:
+        self.update(episode, step)
 
 
 class TreeNode:
@@ -290,8 +259,6 @@ def mcts(env: ParametrizedEnv, actions: list[int]) -> int:
     reset_env(env, actions)
     root = TreeNode()
 
-    action_space_n: int = int(get_observation_action_space(env)[1].n)
-
     for _ in range(NUM_MCTS_ITERATIONS):
         node = root
         reset_env(env, actions)
@@ -301,7 +268,7 @@ def mcts(env: ParametrizedEnv, actions: list[int]) -> int:
 
         # Expand leaf node.
         if not node.terminal:
-            node = expand(env, node, action_space_n)
+            node = expand(env, node, env.get_action_space_len())
 
         # Simulate step.
         truncated = False
@@ -310,7 +277,7 @@ def mcts(env: ParametrizedEnv, actions: list[int]) -> int:
 
         while not terminated and not truncated:
             # Use a random rollout policy.
-            action = random.randint(0, action_space_n - 1)
+            action = random.randint(0, env.get_action_space_len() - 1)
             _, reward, terminated, truncated, _ = env.env.step(action)
             total_reward += float(reward)
 
