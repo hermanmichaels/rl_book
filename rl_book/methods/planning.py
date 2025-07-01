@@ -74,7 +74,7 @@ class DynaQ(RLMethod):
 
         self.buffer.push(episode[-2].state, episode[-2].action)
 
-        kappa = 0  # ?
+        kappa = 0.1
 
         cur_state = episode[len(episode) - 2]
         next_state = episode[len(episode) - 1]

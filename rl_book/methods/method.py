@@ -77,7 +77,7 @@ class RLMethod(ABC):
         """
         return (
             np.nonzero(mask)[0].tolist()
-            if mask is not None
+            if mask
             else np.asarray([a for a in range(self.env.get_action_space_len())])
         )
 

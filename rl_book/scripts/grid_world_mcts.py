@@ -1,6 +1,6 @@
 import gymnasium as gym
 
-from rl_book.env import ParametrizedEnv
+from rl_book.env import GridWorldEnv
 from rl_book.methods.planning import mcts
 
 GAMMA = 0.9
@@ -20,7 +20,7 @@ def solve_grid_world() -> None:
         map_name="4x4",
         is_slippery=False,
     )
-    env_train = ParametrizedEnv(gym_env_train, GAMMA, False)
+    env_train = GridWorldEnv(gym_env_train, GAMMA, True, True)
 
     gym_env_test = gym.make(
         "FrozenLake-v1",

@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 import numpy as np
 
@@ -8,4 +8,4 @@ class ReplayItem:
     state: int
     action: int
     reward: float
-    mask: np.ndarray | list = []
+    mask: np.ndarray | list = field(default_factory=list)
