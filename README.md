@@ -17,3 +17,6 @@ It contains code reproducing all the shown results, and will grow along with the
 ## Grid World
 
     python grid_world.py --method {METHOD}
+
+# Change History
+- 01/07/2025: Refactor RL framework and introduce multi-player envs and games. DP methods are left untouched since they are problemtic to fit into the new framework and hard to extend to multi-player games. MC with Exploring Starts and the custom non-policy MC method are removed, since they were for demonstration purposes only anyways. Prioritized Sweeping is removed since it is not compatible with the new framework.
