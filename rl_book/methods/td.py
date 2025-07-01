@@ -24,7 +24,7 @@ class TDMethod(RLMethod):
         return cloned
 
     def act(
-        self, state: int, step: int | None = None, mask: np.ndarray | None = None
+        self, state: int, step: int | None = None, mask: np.ndarray | list = []
     ) -> int:
         allowed_actions = self.get_allowed_actions(mask)
         if self._train and step and random.uniform(0, 1) < self.env.eps(step):
@@ -91,7 +91,6 @@ class QLearning(TDMethod):
             - self.Q[cur_state.state, cur_state.action]
         )
 
-    # TODO: needed?
     def finalize(self, episode: list[ReplayItem], step: int) -> None:
         self.update(episode, step)
 

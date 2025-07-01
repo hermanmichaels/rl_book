@@ -9,7 +9,7 @@ RESET = "\033[0m"
 BOLD = "\033[1m"
 
 
-def log_methods(methods: list, step: int):
+def log_methods(methods: list[MethodWithStats], step: int):
     sorted_methods = sorted(methods, key=lambda x: -x.get_win_ratio())
     max_name_len = max(len(m.method.get_name()) for m in methods)
     separator = "-" * max_name_len + "|" + "-" * 26

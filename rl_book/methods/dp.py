@@ -45,7 +45,7 @@ class DPMethod(RLMethod):
         self.pi = pi
 
     def act(
-        self, state: int, step: int | None = None, mask: np.ndarray | None = None
+        self, state: int, step: int | None = None, mask: np.ndarray | list = []
     ) -> int:
         return self.pi[state]
 

@@ -111,7 +111,7 @@ def train_multi_player(
             ) = env.env.last()  # type: ignore
 
             done = termination or truncation
-    
+
             if done:
                 action = None
                 # Game over, rewards contains all playerss

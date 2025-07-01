@@ -8,4 +8,4 @@ class ReplayItem:
     state: int
     action: int
     reward: float
-    mask: np.ndarray | None = None
+    mask: np.ndarray | list = []

@@ -49,6 +49,9 @@ class ParametrizedEnv:
     def get_observation_space_len(self) -> int:
         raise NotImplementedError
 
+    def get_max_num_steps(self) -> int:
+        raise NotImplementedError
+
 
 class GridWorldEnv(ParametrizedEnv):
     """Env wrapper for "Grid world"."""
@@ -102,9 +105,10 @@ class GridWorldEnv(ParametrizedEnv):
     def get_observation_space_len(self) -> int:
         assert isinstance(self.env.observation_space, Discrete)
         return int(self.env.observation_space.n)
-    
+
     def get_max_num_steps(self) -> int:
-        return self.env.observation_space.n * 4
+        assert isinstance(self.env.observation_space, Discrete)
+        return int(self.env.observation_space.n) * 4
 
 
 class GameResult(Enum):

@@ -46,7 +46,7 @@ class DynaQ(RLMethod):
         self.n = n
         self.buffer = ReplayBuffer()
         self.model: DefaultDict[
-            tuple[int, int], tuple[int, float, int, np.ndarray | None]
+            tuple[int, int], tuple[int, float, int, np.ndarray | list]
         ] = defaultdict(model_factory)
         self.plus_mode = plus_mode
 
@@ -58,7 +58,7 @@ class DynaQ(RLMethod):
         cloned.Q = copy.deepcopy(self.Q)
         return cloned
 
-    def act(self, state: int, step: int | None = None, mask: np.ndarray | None = None):
+    def act(self, state: int, step: int | None = None, mask: np.ndarray | list = []):
         allowed_actions = self.get_allowed_actions(mask)
         if self._train and step and random.uniform(0, 1) < self.env.eps(step):
             return random.choice(allowed_actions)
@@ -72,9 +72,7 @@ class DynaQ(RLMethod):
         if len(episode) <= 1:
             return
 
-        self.buffer.push(
-            episode[-2].state, episode[-2].action
-        )  # TODO: why was -1 so bad?
+        self.buffer.push(episode[-2].state, episode[-2].action)
 
         kappa = 0  # ?
 

@@ -15,7 +15,9 @@ class MCMethod(RLMethod):
     def __init__(self, env: ParametrizedEnv, load_weights: bool = False) -> None:
         super().__init__(env, load_weights)
         self.Q: DefaultDict[tuple[int, int], float] = defaultdict(float)
-        self.pi: DefaultDict[tuple[int, int], float] = defaultdict(ConstantFactory(1.0 / self.env.get_action_space_len()))
+        self.pi: DefaultDict[tuple[int, int], float] = defaultdict(
+            ConstantFactory(1.0 / self.env.get_action_space_len())
+        )
 
     def clone(self):
         cloned = super().clone()
@@ -23,18 +25,18 @@ class MCMethod(RLMethod):
         return cloned
 
     def act(
-        self, state: int, step: int | None = None, mask: np.ndarray | None = None
+        self, state: int, step: int | None = None, mask: np.ndarray | list = []
     ) -> int:
         actions = self.get_allowed_actions(mask)
         probs_arr = [self.pi[state, a] for a in actions]
         # Masked actions can cause sum(probs_arr) to be less than 1, causing
         # random.choice to crash
-        probs_arr = np.asarray(probs_arr) / sum(probs_arr)
+        probs = np.asarray(probs_arr) / sum(probs_arr)
 
         if self._train:
-            return np.random.choice(actions, p=probs_arr)
+            return np.random.choice(actions, p=probs)
         else:
-            return actions[np.argmax(probs_arr)]
+            return actions[np.argmax(probs)]
 
     def _get_save_data(self) -> Any:
         return self.Q, self.pi
