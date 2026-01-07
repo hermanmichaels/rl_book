@@ -3,7 +3,7 @@ import argparse
 import gymnasium as gym
 from gymnasium.envs.toy_text.frozen_lake import generate_random_map
 
-from rl_book.env import GridWorldEnv
+from rl_book.env import GridWorldEnv, GridWorldImageWrapper, ObsMode
 from rl_book.methods.dp import policy_iteration, value_iteration
 from rl_book.methods.inference import test_single_player
 from rl_book.methods.mc import OffPolicyMC, OnPolicyMC
@@ -12,6 +12,8 @@ from rl_book.methods.planning import DynaQ
 from rl_book.methods.td import DoubleQ, ExpectedSarsa, QLearning, Sarsa
 from rl_book.methods.td_n import SarsaN, TreeN
 from rl_book.methods.training import train_single_player
+from rl_book.methods.td_approx import SemiGradientSarsaCNN, SemiGradientSarsaLinear
+import torch
 
 GAMMA = 0.97
 EPS = 0.001
@@ -29,11 +31,12 @@ def solve_grid_world(method_name: str) -> None:
     gym_env_train = gym.make(
         "FrozenLake-v1",
         desc=desc,
-        # map_name="4x4",
         is_slippery=False,
     )
+    obs_mode = ObsMode.RASTERIZED if method_name == "semi_gradient_sarsa_cnn" else ObsMode.DEFAULT
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     env_train = GridWorldEnv(
-        gym_env_train, GAMMA, intermediate_rewards=True, eps_decay=True
+        gym_env_train, GAMMA, intermediate_rewards=True, eps_decay=True, obs_mode=obs_mode, device=device
     )
 
     # Find policy
@@ -61,6 +64,10 @@ def solve_grid_world(method_name: str) -> None:
             method = TreeN(env_train)
         elif method_name == "dyna_q":
             method = DynaQ(env_train)
+        elif method_name == "semi_gradient_sarsa_linear":
+            method = SemiGradientSarsaLinear(env_train)
+        elif method_name == "semi_gradient_sarsa_cnn":
+            method = SemiGradientSarsaCNN(env_train, device=device)
         else:
             raise ValueError(f"Unknown solution method {method_name}")
 
@@ -73,6 +80,8 @@ def solve_grid_world(method_name: str) -> None:
         is_slippery=False,
         render_mode="human",
     )
+    if obs_mode == ObsMode.RASTERIZED:
+        gym_env_test = GridWorldImageWrapper(gym_env_test, device=device)
 
     # Test policy and visualize found solution
     test_single_player(gym_env_test, method)
