@@ -1,14 +1,15 @@
 from enum import Enum
 from typing import Any
 
-import numpy as np
-from gymnasium.core import Env  # TODO: or any other env
-from gymnasium.spaces import Discrete, Box
 import gymnasium as gym
-import matplotlib.pyplot as plt
-import math
+import numpy as np
 import torch
+from gymnasium.core import Env  # TODO: or any other env
+from gymnasium.spaces import Box, Discrete
 
+
+# Toggle different observation "modes", such as
+# "default" (int values) and rasterized images.
 class ObsMode(Enum):
     INVALID = 0
     DEFAULT = 1
@@ -66,7 +67,13 @@ class GridWorldEnv(ParametrizedEnv):
     """Env wrapper for "Grid world"."""
 
     def __init__(
-        self, env: Env, gamma: float, eps_decay: bool, intermediate_rewards: bool, obs_mode: ObsMode, device: torch.device
+        self,
+        env: Env,
+        gamma: float,
+        eps_decay: bool,
+        intermediate_rewards: bool,
+        obs_mode: ObsMode,
+        device: torch.device,
     ) -> None:
         if obs_mode == ObsMode.RASTERIZED:
             super().__init__(GridWorldImageWrapper(env, device), gamma, eps_decay)
@@ -82,7 +89,9 @@ class GridWorldEnv(ParametrizedEnv):
         Used for reward heuristics under the assumption that a higher such
         value is better / closer to the goal.
         """
-        return (observation // self.grid_size + observation % self.grid_size) / self.grid_size
+        return (
+            observation // self.grid_size + observation % self.grid_size
+        ) / self.grid_size
 
     def step(self, action: int, old_obs: int) -> tuple[int, float, bool, bool, dict]:
         """Executes a step in the environment and, among others, returns new observation
@@ -127,62 +136,37 @@ class GridWorldEnv(ParametrizedEnv):
 
     def get_max_num_steps(self) -> int:
         return self.grid_size**2 * 4
-    
-def show_grid_image(obs):
-    """
-    obs: np.array with shape (3, H, W)
-    Plots a single RGB image for inspection.
-    """
-    H, W = obs.shape[1], obs.shape[2]
-
-    # Combine channels into RGB
-    # Agent: red, Goal: green, Walls: blue
-    rgb = np.zeros((H, W, 3), dtype=np.float32)
-    rgb[..., 0] = obs[0]  # agent
-    rgb[..., 1] = obs[1]  # goal
-    rgb[..., 2] = obs[2]  # walls
-
-    plt.figure(figsize=(5,5))
-    plt.imshow(rgb, interpolation='nearest')
-    plt.grid(True, color='gray', linewidth=1)
-    plt.xticks(np.arange(-0.5, W, 1), [])
-    plt.yticks(np.arange(-0.5, H, 1), [])
-    plt.title("GridWorld Image Representation")
-    plt.savefig("/home/oliver/Code/Blog/RL/RLbook/obs.png")
-    print("saved")
 
 
 class GridWorldImageWrapper(gym.ObservationWrapper):
-    def __init__(self, env, device: torch.device):
+    """Wrapper around GridWorldEnv to provide rasterized images as observations."""
+
+    def __init__(self, env: GridWorldEnv, device: torch.device):
         super().__init__(env)
 
-        H = env.unwrapped.desc.shape[0]
-        W = env.unwrapped.desc.shape[1]
-        self.H = H
-        self.W = W
+        self.H = env.unwrapped.desc.shape[0]
+        self.W = env.unwrapped.desc.shape[1]
         self.device = device
 
         # Precompute walls and goal
         walls = set()
         goal_pos = None
-        for r in range(H):
-            for c in range(W):
-                if env.unwrapped.desc[r, c] == b'H':
+        for r in range(self.H):
+            for c in range(self.W):
+                if env.unwrapped.desc[r, c] == b"H":
                     walls.add((r, c))
-                elif env.unwrapped.desc[r, c] == b'G':
+                elif env.unwrapped.desc[r, c] == b"G":
                     goal_pos = (r, c)
-
-        self.walls = walls
-        self.goal_pos = goal_pos
 
         self.observation_space = Box(
             low=0.0,
             high=1.0,
-            shape=(3, H, W),
+            shape=(3, self.H, self.W),
             dtype=np.float32,
         )
 
-        # Create a base obs with goal and walls precomputed
+        # Create a base obs with goal and walls precomputed,
+        # since this information is static
         self.base_obs = torch.zeros((3, self.H, self.W), device=device)
         self.base_obs[1, goal_pos[0], goal_pos[1]] = 1.0
         for (r, c) in walls:
@@ -201,19 +185,31 @@ class GridWorldImageWrapper(gym.ObservationWrapper):
 
         return obs
 
-    def observation(self, state):
+    def observation(self, state: int) -> tuple[torch.Tensor, int]:
+        """Computes the rasterized image observation.
+
+        Args:
+            state: original env state
+
+        Returns:
+            - rasterized state
+            - as well as original int state (for intermediate rewards)
+        """
         # Compute agent position from integer state
         x = state // self.W
         y = state % self.W
         agent_pos = (x, y)
 
-        return self.gridworld_to_image(
-            agent_pos=agent_pos,
-            goal_pos=self.goal_pos,
-            walls=self.walls,
-            H=self.H,
-            W=self.W,
-        ),  state # TODO: only for intermeidate reward
+        return (
+            self.gridworld_to_image(
+                agent_pos=agent_pos,
+                goal_pos=self.goal_pos,
+                walls=self.walls,
+                H=self.H,
+                W=self.W,
+            ),
+            state,
+        )
 
 
 class GameResult(Enum):

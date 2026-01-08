@@ -1,6 +1,7 @@
 import argparse
 
 import gymnasium as gym
+import torch
 from gymnasium.envs.toy_text.frozen_lake import generate_random_map
 
 from rl_book.env import GridWorldEnv, GridWorldImageWrapper, ObsMode
@@ -10,10 +11,10 @@ from rl_book.methods.mc import OffPolicyMC, OnPolicyMC
 from rl_book.methods.method import RLMethod
 from rl_book.methods.planning import DynaQ
 from rl_book.methods.td import DoubleQ, ExpectedSarsa, QLearning, Sarsa
+from rl_book.methods.td_approx import (SemiGradientSarsaCNN,
+                                       SemiGradientSarsaLinear)
 from rl_book.methods.td_n import SarsaN, TreeN
 from rl_book.methods.training import train_single_player
-from rl_book.methods.td_approx import SemiGradientSarsaCNN, SemiGradientSarsaLinear
-import torch
 
 GAMMA = 0.97
 EPS = 0.001
@@ -33,10 +34,19 @@ def solve_grid_world(method_name: str) -> None:
         desc=desc,
         is_slippery=False,
     )
-    obs_mode = ObsMode.RASTERIZED if method_name == "semi_gradient_sarsa_cnn" else ObsMode.DEFAULT
+    obs_mode = (
+        ObsMode.RASTERIZED
+        if method_name == "semi_gradient_sarsa_cnn"
+        else ObsMode.DEFAULT
+    )
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     env_train = GridWorldEnv(
-        gym_env_train, GAMMA, intermediate_rewards=True, eps_decay=True, obs_mode=obs_mode, device=device
+        gym_env_train,
+        GAMMA,
+        intermediate_rewards=True,
+        eps_decay=True,
+        obs_mode=obs_mode,
+        device=device,
     )
 
     # Find policy
