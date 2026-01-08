@@ -16,7 +16,7 @@ from rl_book.replay_utils import ReplayItem
 ALPHA = 0.1
 
 
-class ApproximateTDMethod(RLMethod, ABC):
+class ApproximateTDMethod(RLMethod[int | tuple[torch.Tensor, int]], ABC):
     def __init__(self, env: ParametrizedEnv, load_weights: bool = False) -> None:
         super().__init__(env, load_weights)
 
@@ -27,7 +27,7 @@ class ApproximateTDMethod(RLMethod, ABC):
     @torch.no_grad()
     def act(
         self,
-        state: int | torch.Tensor,
+        state: int | tuple[torch.Tensor, int],
         step: int | None = None,
         mask: np.ndarray | list = [],
     ) -> int:
@@ -50,7 +50,9 @@ class ApproximateTDMethod(RLMethod, ABC):
         pass
 
     @abstractmethod
-    def q(self, state: int | torch.Tensor, allowed_actions: np.ndarray) -> torch.Tensor:
+    def q(
+        self, state: int | tuple[torch.Tensor, int], allowed_actions: np.ndarray
+    ) -> torch.Tensor:
         """Computes q function.
 
         Args:
@@ -78,7 +80,9 @@ class SemiGradientSarsaLinear(ApproximateTDMethod):
     def get_name(self) -> str:
         return "SemiGradientSarsa-Linear"
 
-    def feature_fn(self, state: int, action: int) -> np.ndarray:
+    def feature_fn(
+        self, state: int | tuple[torch.Tensor, int], action: int
+    ) -> np.ndarray:
         """Simple feature function returning a one-hot representation
         of state and action.
 
@@ -89,19 +93,23 @@ class SemiGradientSarsaLinear(ApproximateTDMethod):
         Returns:
             feature vector
         """
+        assert isinstance(state, int)
         x = np.zeros(self.num_states * self.num_actions)
         idx = state * self.num_actions + action
         x[idx] = 1.0
         return x
 
-    def q(self, state: int | torch.Tensor, allowed_actions: np.ndarray) -> torch.Tensor:
-        assert isinstance(state, int)
+    def q(
+        self, state: int | tuple[torch.Tensor, int], allowed_actions: np.ndarray
+    ) -> torch.Tensor:
         q_values = torch.Tensor(
             [np.dot(self.w, self.feature_fn(state, a)) for a in allowed_actions]
         )
         return q_values
 
-    def _update(self, episode, is_final: bool) -> None:
+    def _update(
+        self, episode: list[ReplayItem[int | tuple[torch.Tensor, int]]], is_final: bool
+    ) -> None:
         """Executes one update step.
 
         Args:
@@ -127,10 +135,14 @@ class SemiGradientSarsaLinear(ApproximateTDMethod):
         delta = target - q_sa
         self.w += ALPHA * delta * x
 
-    def update(self, episode: list[ReplayItem], step: int) -> None:
+    def update(
+        self, episode: list[ReplayItem[int | tuple[torch.Tensor, int]]], step: int
+    ) -> None:
         self._update(episode, False)
 
-    def finalize(self, episode: list[ReplayItem], step: int) -> None:
+    def finalize(
+        self, episode: list[ReplayItem[int | tuple[torch.Tensor, int]]], step: int
+    ) -> None:
         self._update(episode, True)
 
     def _get_save_data(self) -> Any:
@@ -192,14 +204,18 @@ class SemiGradientSarsaCNN(ApproximateTDMethod):
     def get_name(self) -> str:
         return "SemiGradientSarsa-CNN"
 
-    def q(self, state: torch.Tensor | int, allowed_actions: np.ndarray) -> torch.Tensor:
-        assert isinstance(state, torch.Tensor)
+    def q(
+        self, state: int | tuple[torch.Tensor, int], allowed_actions: np.ndarray
+    ) -> torch.Tensor:
+        assert isinstance(state, tuple)
         q_values = self.model(state[0].unsqueeze(0))
         mask = torch.zeros_like(q_values)
         mask[:, allowed_actions] = 1.0
         return q_values * mask
 
-    def _update(self, episode, is_final: bool) -> None:
+    def _update(
+        self, episode: list[ReplayItem[int | tuple[torch.Tensor, int]]], is_final: bool
+    ) -> None:
         """Executes one update step.
 
         Args:
@@ -211,6 +227,9 @@ class SemiGradientSarsaCNN(ApproximateTDMethod):
 
         prev_state = episode[len(episode) - 2]
         cur_state = episode[len(episode) - 1]
+
+        assert isinstance(prev_state.state, tuple)
+        assert isinstance(cur_state.state, tuple)
 
         q_values = self.model(prev_state.state[0].unsqueeze(0))
         q_sa = q_values[0, prev_state.action]
@@ -229,10 +248,14 @@ class SemiGradientSarsaCNN(ApproximateTDMethod):
         loss.backward()
         self.optimizer.step()
 
-    def update(self, episode: list[ReplayItem], step: int) -> None:
+    def update(
+        self, episode: list[ReplayItem[int | tuple[torch.Tensor, int]]], step: int
+    ) -> None:
         self._update(episode, False)
 
-    def finalize(self, episode: list[ReplayItem], step: int) -> None:
+    def finalize(
+        self, episode: list[ReplayItem[int | tuple[torch.Tensor, int]]], step: int
+    ) -> None:
         self._update(episode, True)
 
     def _get_save_data(self) -> Any:

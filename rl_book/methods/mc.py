@@ -12,7 +12,7 @@ from rl_book.replay_utils import ReplayItem
 from rl_book.utils import ConstantFactory
 
 
-class MCMethod(RLMethod, ABC):
+class MCMethod(RLMethod[int], ABC):
     def __init__(self, env: ParametrizedEnv, load_weights: bool = False) -> None:
         super().__init__(env, load_weights)
         self.Q: DefaultDict[tuple[int, int], float] = defaultdict(float)
@@ -55,7 +55,7 @@ class OnPolicyMC(MCMethod):
     def get_name(self) -> str:
         return "OnPolicyMc"
 
-    def finalize(self, episode: list[ReplayItem], step: int) -> None:
+    def finalize(self, episode: list[ReplayItem[int]], step: int) -> None:
         G = 0.0
         for t in range(len(episode) - 2, -1, -1):
             s = episode[t].state

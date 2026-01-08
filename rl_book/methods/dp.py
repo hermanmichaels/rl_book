@@ -41,7 +41,7 @@ def extract_policy(
     )
 
 
-class DPMethod(RLMethod, ABC):
+class DPMethod(RLMethod[int], ABC):
     def __init__(self, env: ParametrizedEnv, pi: np.ndarray) -> None:
         super().__init__(env)
         self.pi = pi
