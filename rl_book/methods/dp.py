@@ -1,3 +1,5 @@
+from abc import ABC
+
 import numpy as np
 
 from rl_book.env import ParametrizedEnv
@@ -39,7 +41,7 @@ def extract_policy(
     )
 
 
-class DPMethod(RLMethod):
+class DPMethod(RLMethod, ABC):
     def __init__(self, env: ParametrizedEnv, pi: np.ndarray) -> None:
         super().__init__(env)
         self.pi = pi
