@@ -39,7 +39,7 @@ class SarsaN(TDMethod):
         if tau >= 0:
             G = sum(
                 [
-                    episode[i].reward * self.env.eps(step) ** (i - tau)
+                    episode[i].reward * self.env.gamma ** (i - tau)
                     for i in range(tau, min(tau + self.n, len(episode)))
                 ]
             )

@@ -12,7 +12,8 @@ from rl_book.methods.method import RLMethod
 from rl_book.methods.planning import DynaQ
 from rl_book.methods.td import DoubleQ, ExpectedSarsa, QLearning, Sarsa
 from rl_book.methods.td_approx import (SemiGradientSarsaCNN,
-                                       SemiGradientSarsaLinear)
+                                       SemiGradientSarsaLinear,
+                                       SemiGradientSarsaNCNN)
 from rl_book.methods.td_n import SarsaN, TreeN
 from rl_book.methods.training import train_single_player
 
@@ -36,7 +37,7 @@ def solve_grid_world(method_name: str) -> None:
     )
     obs_mode = (
         ObsMode.RASTERIZED
-        if method_name == "semi_gradient_sarsa_cnn"
+        if method_name in ["semi_gradient_sarsa_cnn", "semi_gradient_sarsa_n_cnn"]
         else ObsMode.DEFAULT
     )
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -78,6 +79,8 @@ def solve_grid_world(method_name: str) -> None:
             method = SemiGradientSarsaLinear(env_train)
         elif method_name == "semi_gradient_sarsa_cnn":
             method = SemiGradientSarsaCNN(env_train, device=device)
+        elif method_name == "semi_gradient_sarsa_n_cnn":
+            method = SemiGradientSarsaNCNN(env_train, device=device)
         else:
             raise ValueError(f"Unknown solution method {method_name}")
 

@@ -193,7 +193,7 @@ class SemiGradientSarsaCNN(ApproximateTDMethod):
         num_channels = 3
         num_actions = 4
         self.model = GridWorldCNN(num_channels, num_actions).to(device)
-        self.optimizer = torch.optim.Adam(self.model.parameters(), lr=ALPHA / 100)
+        self.optimizer = torch.optim.Adam(self.model.parameters(), lr=ALPHA / 10)
         self.device = device
 
     def clone(self) -> "SemiGradientSarsaCNN":
@@ -241,7 +241,9 @@ class SemiGradientSarsaCNN(ApproximateTDMethod):
                 q_next = self.model(cur_state.state[0].unsqueeze(0))[
                     0, cur_state.action
                 ]
-                target = prev_state.reward + self.env.gamma * q_next.detach()
+                target = (
+                    prev_state.reward + self.env.gamma * q_next.detach()
+                )  # TODO: step
 
         loss = F.mse_loss(q_sa, target)
         self.optimizer.zero_grad()
@@ -257,6 +259,107 @@ class SemiGradientSarsaCNN(ApproximateTDMethod):
         self, episode: list[ReplayItem[int | tuple[torch.Tensor, int]]], step: int
     ) -> None:
         self._update(episode, True)
+
+    def _get_save_data(self) -> Any:
+        return self.model.state_dict()
+
+    def _load_weights(self, save_path: str) -> None:
+        state_dict = torch.load(save_path, map_location=self.device)
+        self.model.load_state_dict(state_dict)
+
+
+class SemiGradientSarsaNCNN(ApproximateTDMethod):
+    def __init__(
+        self,
+        env: ParametrizedEnv,
+        load_weights: bool = False,
+        device: torch.device = torch.device("cpu"),
+        n: int = 3,
+    ) -> None:
+        super().__init__(env, load_weights)
+
+        num_channels = 3
+        self.num_actions = 4
+        self.model = GridWorldCNN(num_channels, self.num_actions).to(device)
+        self.optimizer = torch.optim.Adam(self.model.parameters(), lr=ALPHA / 10)
+        self.device = device
+        self.n = n
+
+    def clone(self) -> "SemiGradientSarsaNCNN":
+        cloned = self.__class__(self.env, False)
+        cloned.model.load_state_dict(copy.deepcopy(self.model.state_dict()))
+        return cloned
+
+    def get_name(self) -> str:
+        return "SemiGradientSarsaN-CNN"
+
+    def q(
+        self, state: int | tuple[torch.Tensor, int], allowed_actions: np.ndarray
+    ) -> torch.Tensor:
+        assert isinstance(state, tuple)
+        q_values = self.model(state[0].unsqueeze(0))
+        mask = torch.zeros_like(q_values)
+        mask[:, allowed_actions] = 1.0
+        return q_values * mask
+
+    def _update(
+        self,
+        episode: list[ReplayItem[int | tuple[torch.Tensor, int]]],
+        tau: int | None = None,
+    ) -> None:
+        """Executes one update step.
+
+        Args:
+            episode: current episode up to now
+            is_final: true when episode has ended
+        """
+        is_final = True
+        if tau is None:
+            # tau is set when finalizing the episode - otherwise pick
+            # the correct update step here.
+            tau = len(episode) - self.n - 1
+            is_final = False
+
+        if tau >= 0:
+            all_actions = np.asarray([a for a in range(self.num_actions)])
+            with torch.no_grad():
+                G = sum(
+                    [
+                        episode[i].reward * self.env.gamma ** (i - tau)
+                        for i in range(tau, min(tau + self.n, len(episode)))
+                    ]
+                )
+                G_torch = torch.tensor(G, dtype=torch.float32, device=self.device)
+                if not is_final:
+                    G_torch = (
+                        G_torch
+                        + self.env.gamma**self.n
+                        * self.q(episode[tau + self.n].state, all_actions)[
+                            0, episode[tau + self.n].action
+                        ].detach()
+                    )
+                target = G_torch
+
+            q_values = self.q(episode[tau].state, all_actions)
+            q_sa = q_values[0, episode[tau].action]
+
+            loss = F.mse_loss(q_sa, target)
+            self.optimizer.zero_grad()
+            loss.backward()
+            self.optimizer.step()
+
+    def update(
+        self, episode: list[ReplayItem[int | tuple[torch.Tensor, int]]], step: int
+    ) -> None:
+        self._update(episode)
+
+    def finalize(
+        self, episode: list[ReplayItem[int | tuple[torch.Tensor, int]]], step: int
+    ) -> None:
+        # Replay has terminated - still finish updating the values
+        # by going over the remaining episode.
+        for tau in range(len(episode) - self.n - 1, len(episode)):
+            self._update(episode, tau)
 
     def _get_save_data(self) -> Any:
         return self.model.state_dict()
