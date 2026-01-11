@@ -63,6 +63,9 @@ class Sarsa(TDMethod):
             - self.Q[prev_state.state, prev_state.action]
         )
 
+        # import ipdb
+        # ipdb.set_trace()
+
     def finalize(self, episode: list[ReplayItem[int]], step: int) -> None:
         self.update(episode, step)
 

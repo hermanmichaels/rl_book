@@ -2,7 +2,7 @@ import copy
 import pickle
 import random
 from abc import ABC, abstractmethod
-from typing import Any
+from typing import Any, TypeVar, Type
 
 import numpy as np
 import torch
@@ -14,6 +14,8 @@ from rl_book.methods.method import RLMethod
 from rl_book.replay_utils import ReplayItem
 
 ALPHA = 0.1
+
+T = TypeVar("T")
 
 
 class ApproximateTDMethod(RLMethod[int | tuple[torch.Tensor, int]], ABC):
@@ -35,14 +37,14 @@ class ApproximateTDMethod(RLMethod[int | tuple[torch.Tensor, int]], ABC):
         if self._train and step and random.uniform(0, 1) < self.env.eps(step):
             return random.choice(allowed_actions)
         else:
-            all_actions = self.get_allowed_actions([])
             q_values = self.q(state, allowed_actions)
             # Sample uniformly in case of ties
             max_q = q_values.max()
             probs = (q_values == max_q).float()
             probs /= probs.sum()
             chosen_idx: int = int(torch.multinomial(probs, 1).item())
-            if chosen_idx >= len(all_actions):
+            all_actions = self.get_allowed_actions([])
+            if chosen_idx not in allowed_actions:
                 import ipdb
                 ipdb.set_trace()
             return all_actions[chosen_idx]
@@ -161,10 +163,64 @@ class SemiGradientSarsaLinear(ApproximateTDMethod):
 class GridWorldCNN(nn.Module):
     """Simple CNN to process rasterized GridWorld images and output Q values."""
 
-    def __init__(self, in_channels: int, num_actions: int) -> None:
+    def __init__(self, num_actions: int) -> None:
         super().__init__()
 
-        self.conv1 = nn.Conv2d(in_channels, 16, kernel_size=2, padding=0)
+        self.conv1 = nn.Conv2d(3, 16, kernel_size=2, padding=0)
+        self.conv2 = nn.Conv2d(16, 32, kernel_size=2, padding=0)
+        self.pool = nn.AdaptiveAvgPool2d(1)
+        self.fc = nn.Linear(32, num_actions)
+
+    def forward(self, x: torch.Tensor):
+        """Forward call.
+
+        Args:
+            x: input tensor [bs, C, H, W]
+
+        Returns:
+            Q values [bs, num_actions]
+        """
+        x = F.relu(self.conv1(x))
+        x = F.relu(self.conv2(x))
+        x = self.pool(x)
+        x = x.view(x.size(0), -1)
+        x = self.fc(x)
+        return x
+    
+class CNNTicTacToe(nn.Module):
+    """Simple CNN to process rasterized GridWorld images and output Q values."""
+
+    def __init__(self, num_actions: int) -> None:
+        super().__init__()
+
+        self.conv1 = nn.Conv2d(2, 16, kernel_size=2, padding=0)
+        self.conv2 = nn.Conv2d(16, 32, kernel_size=2, padding=0)
+        self.pool = nn.AdaptiveAvgPool2d(1)
+        self.fc = nn.Linear(16, num_actions) # 32
+
+    def forward(self, x: torch.Tensor):
+        """Forward call.
+
+        Args:
+            x: input tensor [bs, C, H, W]
+
+        Returns:
+            Q values [bs, num_actions]
+        """
+        x = F.relu(self.conv1(x))
+        # x = F.relu(self.conv2(x))
+        x = self.pool(x)
+        x = x.view(x.size(0), -1)
+        x = self.fc(x)
+        return x
+    
+class CNNConnectFour(nn.Module):
+    """Simple CNN to process rasterized GridWorld images and output Q values."""
+
+    def __init__(self, num_actions: int) -> None:
+        super().__init__()
+
+        self.conv1 = nn.Conv2d(2, 16, kernel_size=2, padding=0)
         self.conv2 = nn.Conv2d(16, 32, kernel_size=2, padding=0)
         self.pool = nn.AdaptiveAvgPool2d(1)
         self.fc = nn.Linear(16, num_actions) # 32
@@ -191,18 +247,19 @@ class SemiGradientSarsaCNN(ApproximateTDMethod):
         self,
         env: ParametrizedEnv,
         load_weights: bool = False,
+        network_class: Type[T] = GridWorldCNN,
         device: torch.device = torch.device("cpu"),
     ) -> None:
         super().__init__(env, load_weights)
 
-        num_channels = 3
-        num_actions = 9 # 4 TODO
-        self.model = GridWorldCNN(num_channels, num_actions).to(device)
+        num_actions = self.env.get_action_space_len()
+        self.model = network_class(num_actions).to(device)
         self.optimizer = torch.optim.Adam(self.model.parameters(), lr=ALPHA / 10)
         self.device = device
+        self.network_class = network_class
 
     def clone(self) -> "SemiGradientSarsaCNN":
-        cloned = self.__class__(self.env, False)
+        cloned = self.__class__(self.env, False, self.network_class, self.device)
         cloned.model.load_state_dict(copy.deepcopy(self.model.state_dict()))
         return cloned
 
@@ -210,13 +267,14 @@ class SemiGradientSarsaCNN(ApproximateTDMethod):
         return "SemiGradientSarsa-CNN"
 
     def q(
-        self, state: int | tuple[torch.Tensor, int], allowed_actions: np.ndarray
+        self, state: int | tuple[torch.Tensor, int], allowed_actions: np.ndarray # todo: wrong
     ) -> torch.Tensor:
         assert isinstance(state, tuple)
         q_values = self.model(state[0].unsqueeze(0))
-        mask = torch.zeros_like(q_values)
+        mask = torch.zeros_like(q_values).bool()
         mask[:, allowed_actions] = 1.0
-        return q_values * mask
+        q_masked = q_values.masked_fill(~mask, float("-inf"))
+        return q_masked
 
     def _update(
         self, episode: list[ReplayItem[int | tuple[torch.Tensor, int]]], is_final: bool
@@ -279,20 +337,21 @@ class SemiGradientSarsaNCNN(ApproximateTDMethod):
         self,
         env: ParametrizedEnv,
         load_weights: bool = False,
+        network_class: Type[T] = GridWorldCNN,
         device: torch.device = torch.device("cpu"),
         n: int = 3,
     ) -> None:
         super().__init__(env, load_weights)
 
-        num_channels = 3
-        self.num_actions = 9 # TODO
-        self.model = GridWorldCNN(num_channels, self.num_actions).to(device)
+        self.num_actions = self.env.get_action_space_len()
+        self.model = network_class(self.num_actions).to(device)
         self.optimizer = torch.optim.Adam(self.model.parameters(), lr=ALPHA / 10)
+        self.network_class = network_class
         self.device = device
         self.n = n
 
     def clone(self) -> "SemiGradientSarsaNCNN":
-        cloned = self.__class__(self.env, False)
+        cloned = self.__class__(self.env, False, self.network_class, self.device, self.n)
         cloned.model.load_state_dict(copy.deepcopy(self.model.state_dict()))
         return cloned
 
@@ -300,14 +359,15 @@ class SemiGradientSarsaNCNN(ApproximateTDMethod):
         return "SemiGradientSarsaN-CNN"
 
     def q(
-        self, state: int | tuple[torch.Tensor, int], allowed_actions: np.ndarray
+        self, state: int | tuple[torch.Tensor, int], allowed_actions: np.ndarray # todo: wrong
     ) -> torch.Tensor:
         assert isinstance(state, tuple)
         q_values = self.model(state[0].unsqueeze(0))
-        mask = torch.zeros_like(q_values)
+        mask = torch.zeros_like(q_values).bool()
         mask[:, allowed_actions] = 1.0
-        return q_values * mask
-
+        q_masked = q_values.masked_fill(~mask, float("-inf"))
+        return q_masked
+    
     def _update(
         self,
         episode: list[ReplayItem[int | tuple[torch.Tensor, int]]],
