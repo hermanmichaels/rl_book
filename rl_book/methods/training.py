@@ -127,8 +127,16 @@ def train_multi_player(
                 )
             else:
                 mask = observation["action_mask"]
-                cur_method = methods[method_idx] if agent == env.players[player_pos] else opponent
-                state = env.obs_to_state(observation["observation"], player_pos, obs_mode=cur_method.obs_mode)
+                cur_method = (
+                    methods[method_idx]
+                    if agent == env.players[player_pos]
+                    else opponent
+                )
+                state = env.obs_to_state(
+                    observation["observation"],
+                    player_pos,
+                    obs_mode=cur_method.method.obs_mode,
+                )
                 action = cur_method.method.act(state, step, mask)
                 state_dict[agent] = (state, action, mask)
 
@@ -153,7 +161,9 @@ def train_multi_player(
         episode.append(
             ReplayItem(
                 env.obs_to_state(
-                    observation_new["observation"], player_pos, obs_mode=methods[method_idx].obs_mode
+                    observation_new["observation"],
+                    player_pos,
+                    obs_mode=methods[method_idx].method.obs_mode,
                 ),  # type: ignore
                 -1,
                 0,

@@ -1,6 +1,7 @@
 import os
 import pickle
 from abc import ABC
+from enum import Enum
 from typing import Any, Generic, TypeVar
 
 import numpy as np
@@ -15,9 +16,15 @@ S = TypeVar("S")
 class RLMethod(Generic[S], ABC):
     """Base class for RL methods."""
 
-    def __init__(self, env: ParametrizedEnv, load_weights: bool = False) -> None:
+    def __init__(
+        self,
+        env: ParametrizedEnv,
+        load_weights: bool = False,
+        obs_mode: ObsMode = ObsMode.DEFAULT,
+    ) -> None:
         self.env = env
         self._train = True
+        self.obs_mode = obs_mode
 
         if load_weights:
             self.load_weights()
@@ -64,7 +71,7 @@ class RLMethod(Generic[S], ABC):
         pass
 
     def clone(self):
-        cloned = self.__class__(self.env)
+        cloned = self.__class__(self.env, obs_mode=self.obs_mode)
         return cloned
 
     def get_allowed_actions(self, mask: np.ndarray | list) -> np.ndarray:
@@ -114,13 +121,12 @@ class MethodWithStats:
     """Wrapper around RLMethod which keeps track of win / lose stats for
     multi-player games."""
 
-    def __init__(self, method: RLMethod, obs_mode = ObsMode.DEFAULT) -> None:
+    def __init__(self, method: RLMethod, obs_mode=ObsMode.DEFAULT) -> None:
         self.method = method
         self.wins = 0
         self.draws = 0
         self.losses = 0
         self.picks = 0
-        self.obs_mode = obs_mode # TODO: move to method?
 
     def update_pick(self) -> None:
         self.picks += 1
@@ -148,5 +154,4 @@ class MethodWithStats:
         cloned = MethodWithStats(self.method.clone())
         cloned.wins = self.wins
         cloned.picks = self.picks
-        cloned.obs_mode=self.obs_mode
         return cloned

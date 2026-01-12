@@ -36,7 +36,9 @@ def test_against_user(env: MultiPlayerEnv, method: RLMethod) -> None:
         else:
             mask = observation["action_mask"]
 
-            state = env.obs_to_state(observation["observation"], 0, ObsMode.RASTERIZED) # TODO
+            state = env.obs_to_state(
+                observation["observation"], 0, ObsMode.RASTERIZED
+            )  # TODO
             if agent == "player_1":
                 action = method.act(state, mask=mask)
             else:
