@@ -45,16 +45,28 @@ class ApproximateTDMethod(RLMethod[S], Generic[S], ABC):
     ) -> int:
         allowed_actions = self.get_allowed_actions(mask)
         if self._train and step and random.uniform(0, 1) < self.env.eps(step):
-            return random.choice(allowed_actions)
+            probs = allowed_actions.float()
+
+            row_sum = probs.sum(dim=1)
+            invalid_zero_sum = row_sum <= 0
+
+            if invalid_zero_sum.any():
+
+                probs[invalid_zero_sum] += 1 / probs.shape[1]
+
+            return torch.multinomial(probs, num_samples=1).squeeze(1) # * 0
         else:
-            q_values = self.q(state, allowed_actions)
+            q_values = self.q(state, mask)
+
             # Sample uniformly in case of ties
-            max_q = q_values.max()
-            probs = (q_values == max_q).float()
-            probs /= probs.sum()
-            chosen_idx: int = int(torch.multinomial(probs, 1).item())
-            all_actions = self.get_allowed_actions([])
-            return all_actions[chosen_idx]
+
+            max_q = q_values.max(dim=1, keepdim=True).values
+            probs = (max_q == q_values).float()                # [N, A]
+            row_sum = probs.sum(dim=1, keepdim=True)
+
+            probs /= row_sum.clamp_min(0)
+
+            return torch.multinomial(probs, 1)[:, 0]
 
     def _get_save_data(self) -> Any:
         pass
@@ -179,9 +191,9 @@ class SemiGradientSarsaCNN(ApproximateTDMethod[S], Generic[S, T]):
 
         num_actions = env.get_action_space_len()
         self.model = network_class(num_actions).to(device)
-        self.optimizer = torch.optim.Adam(self.model.parameters(), lr=ALPHA / 10)
+        self.optimizer = torch.optim.Adam(self.model.parameters(), lr=1e-3)
         self.network_class = network_class
-        self.all_actions = np.asarray([a for a in range(num_actions)])
+        self.all_actions = np.ones((3, 7)) # TODO N!!
 
         super().__init__(env, load_weights, device, **kwargs)
 
@@ -204,17 +216,21 @@ class SemiGradientSarsaCNN(ApproximateTDMethod[S], Generic[S, T]):
     def q(
         self,
         state: S,
-        allowed_actions: np.ndarray,
+        mask: np.ndarray,
     ) -> torch.Tensor:
+        # print(mask.shape)
+        # print(state.shape)
+        assert mask.ndim == 2
         if isinstance(state, tuple):
             q_values = self.model(state[0].unsqueeze(0))
         elif isinstance(state, torch.Tensor):
-            q_values = self.model(state.unsqueeze(0))
+            q_values = self.model(state) # TODO
         else:
             raise ValueError(f"Got unexpected type {type(state)}")
-        mask = torch.zeros_like(q_values).bool()
-        mask[:, allowed_actions] = 1.0
-        q_masked = q_values.masked_fill(~mask, float("-inf"))
+        # import ipdb
+        # ipdb.set_trace()
+        #  TODO: mask already tensor?
+        q_masked = q_values.masked_fill(~torch.Tensor(mask).bool().cuda(), float("-inf"))
         return q_masked
 
     @override
@@ -230,6 +246,9 @@ class SemiGradientSarsaCNN(ApproximateTDMethod[S], Generic[S, T]):
 
         prev_state = episode[len(episode) - 2]
         cur_state = episode[len(episode) - 1]
+
+        # import ipdb
+        # ipdb.set_trace()
 
         q_values = self.q(prev_state.state, self.all_actions)
         q_sa = q_values[0, prev_state.action]
@@ -250,16 +269,23 @@ class SemiGradientSarsaCNN(ApproximateTDMethod[S], Generic[S, T]):
 
         cur_state = episode[len(episode) - 1]
 
-        q_values = self.q(cur_state.state, self.all_actions)
+        q_values = self.q(cur_state.state, self.all_actions) # TODO: all:actions ??
         q_sa = q_values[0, cur_state.action]
 
         with torch.no_grad():
             target = torch.tensor(cur_state.reward, device=self.device)
 
-        loss = F.mse_loss(q_sa, target)
+        # loss = F.mse_loss(q_sa, target)
+        loss = F.smooth_l1_loss(q_sa, target)
         self.optimizer.zero_grad()
 
         loss.backward()
+
+        torch.nn.utils.clip_grad_norm_(
+            self.model.parameters(),
+            max_norm=10.0,
+        )
+
         self.optimizer.step()
 
     def _get_save_data(self) -> Any:
@@ -269,6 +295,63 @@ class SemiGradientSarsaCNN(ApproximateTDMethod[S], Generic[S, T]):
         with open(save_path, "rb") as f:
             state_dict = pickle.load(f)
             self.model.load_state_dict(state_dict)
+
+    def batch_update(self, batch):
+        repeat_len = batch.states.shape[0]
+
+        q = self.q(batch.states, np.repeat(self.all_actions[:1], repeat_len, axis=0))       
+        q_sa = q.gather(1, batch.actions.unsqueeze(1)).squeeze(1) 
+
+        assert (batch.actions >= 0).all().item()
+        assert (batch.actions < q.shape[1]).all().item()
+
+
+        with torch.no_grad():
+            q_next = self.q(batch.next_states, np.repeat(self.all_actions[:1], repeat_len, axis=0))   
+
+            bad = (~batch.dones.bool()) & (~batch.mask.any(dim=1))
+            if bad.any():
+                idx = bad.nonzero(as_tuple=True)[0][:10]
+                print("Found non-terminal with no legal moves at indices:", idx.tolist())
+                # crash so you can inspect
+                assert False
+
+            legal = batch.mask.bool()                      # [B, A]
+            has_legal = legal.any(dim=1)             # [B]
+
+            q_next_masked = q_next.masked_fill(~legal, float("-inf"))
+
+            max_next = q_next_masked.max(dim=1).values  # [B] (may contain -inf)
+            max_next = torch.where(has_legal, max_next, torch.zeros_like(max_next))
+
+            target = batch.rewards + self.env.gamma * (~batch.dones).float() * max_next
+
+        # import ipdb
+        # ipdb.set_trace()
+
+        # valid_mask = actions != -1
+        loss = F.smooth_l1_loss(q_sa, target)
+     
+        self.optimizer.zero_grad()
+
+        loss.backward()
+
+        torch.nn.utils.clip_grad_norm_(
+                    self.model.parameters(),
+                    max_norm=10.0,
+                )
+
+        # total_norm = torch.norm(
+        #     torch.stack([
+        #         p.grad.norm(2)
+        #         for p in self.model.parameters()
+        #         if p.grad is not None
+        #     ])
+        # )
+
+        # print(f"grad_norm = {total_norm.item():.6f}")
+
+        self.optimizer.step()
 
 
 class SemiGradientSarsaNCNN(ApproximateTDMethod[S], Generic[S, T]):
@@ -316,6 +399,10 @@ class SemiGradientSarsaNCNN(ApproximateTDMethod[S], Generic[S, T]):
             raise ValueError(f"Got unexpected type {type(state)}")
 
         mask = torch.zeros_like(q_values).bool()
+
+        import ipdb
+        ipdb.set_trace()
+        
         mask[:, allowed_actions] = 1.0
         q_masked = q_values.masked_fill(~mask, float("-inf"))
         return q_masked

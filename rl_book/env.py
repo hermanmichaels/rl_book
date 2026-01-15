@@ -1,3 +1,4 @@
+from concurrent.futures import ThreadPoolExecutor
 from enum import Enum
 from typing import Any, Generic, Literal, TypeVar, cast, overload
 
@@ -101,6 +102,7 @@ class ParametrizedEnv(Generic[S]):
             - constant value if no exploration decay
             - otherwise linearly decaying value
         """
+        # step = 100000
         return (
             self.eps_end
             if not self.eps_decay
@@ -298,6 +300,7 @@ class MultiPlayerEnv(ParametrizedEnv[S], Generic[S]):
         raise NotImplementedError
 
 
+
 class TicTacToeEnv(MultiPlayerEnv[int | torch.Tensor]):
     """TicTacToe env."""
 
@@ -353,6 +356,41 @@ class TicTacToeEnv(MultiPlayerEnv[int | torch.Tensor]):
         2 | 5 | 8"
 
 
+<<<<<<< HEAD
+=======
+
+
+def save_connect4_obs(obs, rew, done, act, filename="connect4_obs.png"):
+    import matplotlib.pyplot as plt
+
+    """
+    obs: torch.Tensor or np.ndarray, shape [C, H, W]
+         channel 0 = current player
+         channel 1 = opponent
+    """
+    if hasattr(obs, "detach"):
+        obs = obs.detach().cpu().numpy()
+
+    # Convert to board with values:
+    #  1  = current player
+    # -1  = opponent
+    # import ipdb
+    # ipdb.set_trace()
+    board = obs[0] - obs[1]  # shape [H, W]
+    board = board.transpose(1, 0)
+
+    plt.figure(figsize=(7, 6))
+    plt.imshow(board, cmap="coolwarm", vmin=-1, vmax=1)
+    # plt.colorbar(label="Player")
+    plt.title(f"Connect4 Observation: {act} / {rew} / {done}")
+    # plt.xlabel("Column")
+    # plt.ylabel("Row")
+    # plt.gca().invert_yaxis()  # bottom row at bottom
+    plt.tight_layout()
+    plt.savefig(filename)
+    plt.close()
+
+>>>>>>> f0a2728 (first try vectorized)
 
 class ConnectFourEnv(MultiPlayerEnv[int | torch.Tensor]):
     """ConnectFour env."""
@@ -388,10 +426,19 @@ class ConnectFourEnv(MultiPlayerEnv[int | torch.Tensor]):
 
             return state_encoded
         elif obs_mode == ObsMode.RASTERIZED:
+            # print("###")
+            # save_connect4_obs(obs, f"plots/{self.c}.png")
+            # assert False
+            # TODO: not to tensor
             self.c += 1
-            res = torch.as_tensor(
-                np.transpose(obs, [2, 1, 0]), device=self.device
-            ).float()
+            if obs.ndim == 3:
+                res = torch.as_tensor(
+                    np.transpose(obs, [2, 1, 0]), device=self.device
+                ).float()
+            else:
+                res = torch.as_tensor(
+                    np.transpose(obs, [0, 3, 2, 1]), device=self.device
+                ).float()
             return res
         raise ValueError(f"Got unexpected obs_mode {obs_mode}")
 
@@ -409,3 +456,6 @@ class ConnectFourEnv(MultiPlayerEnv[int | torch.Tensor]):
         return (
             "Please indicate in which column in which to drop the next token (0 - 6):"
         )
+
+
+

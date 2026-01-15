@@ -4,10 +4,18 @@ from typing import Callable
 
 import matplotlib.pyplot as plt
 
+from rl_book.env_vectorized import VectorizedEnv, VectorizedReplayBuffer
+from rl_book.env_vectorized import AgentStatus
 from rl_book.env import MultiPlayerEnv, ParametrizedEnv
 from rl_book.methods.method import MethodWithStats, RLMethod
 from rl_book.pretty_print import log_methods
 from rl_book.replay_utils import ReplayItem
+import numpy as np
+import torch
+import copy
+from pettingzoo.classic import connect_four_v3, tictactoe_v3
+from rl_book.env import ConnectFourEnv, MultiPlayerEnv, TicTacToeEnv, save_connect4_obs
+import time
 
 
 def train_single_player(
@@ -180,3 +188,145 @@ def train_multi_player(
             zoo = zoo[:zoo_size]
 
         env.env.close()
+
+
+
+def train_multi_player_vectorized(
+    env_fn: MultiPlayerEnv, # TODO
+    methods: list[MethodWithStats],
+    zoo: list[MethodWithStats],
+    max_steps: int = 100,
+    zoo_update_interval: int = 1000,
+    zoo_size: int = 50,
+    plot_interval: int | None = None,
+    num_parallel_envs: int = 2
+) -> None:
+    """Trains a method on multi-player environments (atm only 2 players are supported).
+
+    Args:
+        env: env to use
+        methods: methods to train
+        zoo: initial list of opponents
+        max_steps: maixmal number of update steps
+    """
+    # For plotting: keep (step, win_ratio) tuples for every method at different steps.
+    win_ratios: list[list[tuple[int, float]]] = [[] for _ in methods]
+
+    env = VectorizedEnv(env_fn, num_parallel_envs)
+    batch = VectorizedReplayBuffer(num_parallel_envs, env.max_game_steps(), "cuda")
+    batch.reset()
+
+    for step in range(max_steps):
+        start = time.time()
+
+        env.reset(methods, zoo)
+
+        methods[env.method_idx].update_pick(num_parallel_envs)
+        zoo[env.opponent_idx].update_pick(num_parallel_envs)
+
+        state_dict = {}
+
+        for _ in range(env.max_game_steps()):
+            agent = env.agent_selection()  # type: ignore
+            state, mask, rewards, dones = env.last()  # type: ignore
+
+            new_done = dones & (env.status == AgentStatus.ALIVE)
+            done_idxs = np.nonzero(new_done)[0].tolist()
+            env.status[done_idxs] = AgentStatus.STOPPING
+            
+            for idx in done_idxs:
+                # print(idx)
+                # print(env.get_game_result(
+                #         env.rewards(idx, True) # type: ignore
+                #     ))
+                # print(env.get_game_result(
+                #         env.rewards(idx, False) # type: ignore
+                #     ))
+                methods[env.method_idx].update_result(
+                    env.get_game_result(
+                        env.rewards(idx, True) # type: ignore
+                    )
+                )
+                zoo[env.opponent_idx].update_result(
+                    env.get_game_result(
+                        env.rewards(idx, False) # type: ignore
+                    )
+                )
+
+            cur_method = (
+                methods[env.method_idx]
+                if env.is_player(agent) 
+                else env.opponent
+            )
+            action = cur_method.method.act(torch.from_numpy(state).cuda(), step, torch.from_numpy(mask).cuda()).detach().cpu().numpy()
+            action[env.status != AgentStatus.ALIVE] = -1
+            env.step(action)
+
+            state_dict[agent] = (state, action, mask) # todo: mask?
+
+            cur_agent = env.agent_selection()
+            if (
+                env.is_player(cur_agent)  # type: ignore
+                and cur_agent in state_dict  # type: ignore
+            ):
+                s_new, mask, rewards, dones = env.last()  # type: ignore
+
+                s, a, _ = state_dict.pop(cur_agent)
+
+                batch.store(s, a, rewards, s_new, dones, mask) # TODO: batch only needs half
+
+            # TODO
+            if env.status.sum() == num_parallel_envs * 2:
+                break
+
+        # if not methods[env.method_idx].method.get_name() == "Random":
+        #     print("######")
+        #     for i in range(42):
+        #         print(f"{i}: {batch.act_buf[i, 0]} / {batch.rew_buf[i, 0]} / {batch.done_buf[i, 0]}")
+        #         save_connect4_obs(batch.obs_buf[i, 0], batch.rew_buf[i, 0], batch.done_buf[i, 0], batch.act_buf[i, 0], f"plots/1/{i}-a.png")
+        #         save_connect4_obs(batch.obs_next_buf[i, 0], batch.rew_buf[i, 0], batch.done_buf[i, 0], batch.act_buf[i, 0], f"plots/1/{i}-next.png")
+
+        #     print("------")
+        #     for i in range(42):
+        #         print(f"{i}: {batch.act_buf[i, 1]} / {batch.rew_buf[i, 1]} / {batch.done_buf[i, 1]}")
+        #         save_connect4_obs(batch.obs_buf[i, 1], batch.rew_buf[i, 1], batch.done_buf[i, 1], batch.act_buf[i, 1], f"plots/2/{i}-2-a.png")
+        #         save_connect4_obs(batch.obs_next_buf[i, 1], batch.rew_buf[i, 1], batch.done_buf[i, 1], batch.act_buf[i, 1], f"plots/2/{i}-2-next.png")
+
+        #     import ipdb
+        #     ipdb.set_trace()
+
+        methods[env.method_idx].method.batch_update(batch.get_batch("cuda"))
+
+        batch.reset()
+
+        games_per_sec = num_parallel_envs / (time.time() - start)
+
+        if plot_interval and step % plot_interval == 0 and step > 0:
+            for idx, method in enumerate(methods):
+                win_ratios[idx].append((step, method.get_win_ratio()))
+
+            plt.clf()
+            for idx, method in enumerate(methods):
+                x = [epoch for epoch, _ in win_ratios[idx]]
+                y = [win_ratio for _, win_ratio in win_ratios[idx]]
+                plt.plot(x, y, label=method.method.get_name())
+
+            plt.legend()
+            plt.xlabel("Step")
+            plt.ylabel("Win %")
+            plt.savefig("wins.png")
+
+            log_methods(methods, step, games_per_sec)
+
+            for method in methods:
+                method.method.save_weights()
+
+        if step % zoo_update_interval == 0:
+            zoo.append(methods[env.method_idx].clone())
+            zoo = sorted(zoo, key=lambda x: -x.get_win_ratio())
+            zoo = zoo[:zoo_size]
+
+        
+
+        # env.env.close()
+

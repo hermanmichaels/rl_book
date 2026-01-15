@@ -2,6 +2,8 @@ from gymnasium.core import Env
 
 from rl_book.env import MultiPlayerEnv
 from rl_book.methods.method import RLMethod
+import numpy as np
+import torch
 
 NUM_STEPS = 1000
 
@@ -38,11 +40,11 @@ def test_against_user(env: MultiPlayerEnv, method: RLMethod) -> None:
 
             state = env.obs_to_state(observation["observation"], 0, method.obs_mode)
             if agent == "player_1":
-                action = method.act(state, mask=mask)
+                action = method.act(state.unsqueeze(0), mask=np.expand_dims(mask, 0)) # TODO
             else:
                 # action = methods[0].method.act(state, mask)
                 action = int(input(env.user_query()))
 
-        env.env.step(action)
+        env.env.step(action.item() if isinstance(action, torch.Tensor) else action)
 
     env.env.close()

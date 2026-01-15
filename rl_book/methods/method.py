@@ -7,6 +7,7 @@ import numpy as np
 
 from rl_book.env import GameResult, ObsMode, ParametrizedEnv
 from rl_book.replay_utils import ReplayItem
+import torch
 
 SAVE_PATH = "weights/"
 S = TypeVar("S")
@@ -89,11 +90,8 @@ class RLMethod(Generic[S], ABC):
         Returns:
             indices of allowed actions (e.g. [0, 1, 4, ...])
         """
-        return (
-            np.nonzero(mask)[0].tolist()
-            if not self._is_empty_mask(mask)
-            else np.asarray([a for a in range(self.env.get_action_space_len())])
-        )
+        return mask
+
 
     def train(self):
         self._train = True
@@ -121,6 +119,10 @@ class RLMethod(Generic[S], ABC):
 
     def _get_save_data(self) -> Any:
         raise NotImplementedError
+    
+    # TODO: not implemented, implement in random?
+    def batch_update(self, batch):
+        pass
 
 
 class MethodWithStats:
@@ -134,8 +136,8 @@ class MethodWithStats:
         self.losses = 0
         self.picks = 0
 
-    def update_pick(self) -> None:
-        self.picks += 1
+    def update_pick(self, num_picks: int = 1) -> None:
+        self.picks += num_picks
 
     def update_result(self, result: GameResult) -> None:
         if result == GameResult.WIN:

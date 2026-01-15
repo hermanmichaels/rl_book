@@ -1,4 +1,5 @@
 import argparse
+from functools import partial
 
 import torch
 from pettingzoo.classic import connect_four_v3, tictactoe_v3
@@ -7,17 +8,23 @@ from rl_book.env import ConnectFourEnv, MultiPlayerEnv, TicTacToeEnv
 from rl_book.methods.inference import test_against_user
 from rl_book.methods.mc import OffPolicyMC, OnPolicyMC
 from rl_book.methods.method import MethodWithStats
-from rl_book.methods.misc import Random
+from rl_book.methods.misc import Random, RandomBatched
 from rl_book.methods.models import ConnectFourCNN, TicTacToeMLP
 from rl_book.methods.planning import DynaQ
 from rl_book.methods.td import DoubleQ, ExpectedSarsa, QLearning, Sarsa
 from rl_book.methods.td_approx import (SemiGradientSarsaCNN,
                                        SemiGradientSarsaNCNN)
 from rl_book.methods.td_n import SarsaN, TreeN
-from rl_book.methods.training import train_multi_player
+from rl_book.methods.training import train_multi_player, train_multi_player_vectorized
 
 torch.autograd.set_detect_anomaly(True)
 
+import warnings
+
+# warnings.filterwarnings(
+#     "error",
+#     message=".*step\\(\\) called after all agents are terminated or truncated.*",
+# )
 
 def get_env(env_name: str, device: torch.device, render_mode=None):
     env: MultiPlayerEnv
@@ -38,20 +45,22 @@ def get_env(env_name: str, device: torch.device, render_mode=None):
 def benchmark_multi_player(
     env_name: str, load_weights: bool, device: torch.device
 ) -> None:
-    env = get_env(env_name, device)
+    env_fn = partial(get_env, env_name, device)
+    env = env_fn()
     network_class = TicTacToeMLP if env_name == "TicTacToe" else ConnectFourCNN
 
     methods = [
-        MethodWithStats(Random(env)),
-        MethodWithStats(OnPolicyMC(env, load_weights=load_weights)),
-        MethodWithStats(OffPolicyMC(env, load_weights=load_weights)),
-        MethodWithStats(QLearning(env, load_weights=load_weights)),
-        MethodWithStats(Sarsa(env, load_weights=load_weights)),
-        MethodWithStats(ExpectedSarsa(env, load_weights=load_weights)),
-        MethodWithStats(DoubleQ(env, load_weights=load_weights)),
-        MethodWithStats(SarsaN(env, load_weights=load_weights)),
-        MethodWithStats(TreeN(env, load_weights=load_weights)),
-        MethodWithStats(DynaQ(env, load_weights=load_weights)),
+        # MethodWithStats(Random(env)),
+        MethodWithStats(RandomBatched(env)),
+        # MethodWithStats(OnPolicyMC(env, load_weights=load_weights)),
+        # MethodWithStats(OffPolicyMC(env, load_weights=load_weights)),
+        # MethodWithStats(QLearning(env, load_weights=load_weights)),
+        # MethodWithStats(Sarsa(env, load_weights=load_weights)),
+        # MethodWithStats(ExpectedSarsa(env, load_weights=load_weights)),
+        # MethodWithStats(DoubleQ(env, load_weights=load_weights)),
+        # MethodWithStats(SarsaN(env, load_weights=load_weights)),
+        # MethodWithStats(TreeN(env, load_weights=load_weights)),
+        # MethodWithStats(DynaQ(env, load_weights=load_weights)),
         MethodWithStats(
             SemiGradientSarsaCNN(
                 env,
@@ -60,18 +69,18 @@ def benchmark_multi_player(
                 device=device,
             )
         ),
-        MethodWithStats(
-            SemiGradientSarsaNCNN(
-                env,
-                load_weights=load_weights,
-                network_class=network_class,
-                device=device,
-            )
-        ),
+        # MethodWithStats(
+        #     SemiGradientSarsaNCNN(
+        #         env,
+        #         load_weights=load_weights,
+        #         network_class=network_class,
+        #         device=device,
+        #     )
+        # ),
     ]
-    zoo = [MethodWithStats(Random(env))]
+    zoo = [MethodWithStats(RandomBatched(env))]
     # Train given methods
-    train_multi_player(env, methods, zoo, max_steps=1000, plot_interval=1000)
+    train_multi_player_vectorized(env_fn, methods, zoo, max_steps=1000, plot_interval=100)
 
     # Now give user chance to play against one of the methods
     # TOOD: need good wrapper from action to input
