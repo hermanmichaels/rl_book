@@ -79,7 +79,7 @@ def solve_grid_world(method_name: str) -> None:
         else:
             raise ValueError(f"Unknown solution method {method_name}")
 
-        train_single_player(env_train, method, 10000)
+        train_single_player(env_train, method, 1000)
 
     gym_env_test = gym.make(
         "FrozenLake-v1",

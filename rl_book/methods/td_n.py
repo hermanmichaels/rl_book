@@ -36,11 +36,10 @@ class SarsaN(TDMethod):
             tau = len(episode) - self.n - 1
 
         if tau >= 0:
-            end_index = len(episode)
             G = sum(
                 [
                     episode[i].reward * self.env.gamma ** (i - tau)
-                    for i in range(tau, min(tau + self.n, end_index))
+                    for i in range(tau, min(tau + self.n, len(episode)))
                 ]
             )
 

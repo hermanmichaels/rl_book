@@ -2,7 +2,7 @@ import copy
 import pickle
 import random
 from abc import ABC, abstractmethod
-from typing import Any, ClassVar, Generic, Type, TypeVar
+from typing import Any, ClassVar, Generic, Type, TypeVar, override
 
 import numpy as np
 import torch
@@ -78,20 +78,23 @@ class SemiGradientSarsaLinear(ApproximateTDMethod[S], Generic[S]):
         load_weights: bool = False,
         device: torch.device = torch.device("cpu"),
     ) -> None:
-        super().__init__(env, load_weights, device)
-
         self.num_states = env.get_observation_space_len()
         self.num_actions = env.get_action_space_len()
         self.w = np.zeros(self.num_states * self.num_actions)
 
+        super().__init__(env, load_weights, device)
+
+    @override
     def clone(self) -> "SemiGradientSarsaLinear":
-        cloned = self.__class__(self.env, False)
+        cloned = self.__class__(self.env, False, self.device)
         cloned.w = np.copy(self.w)
         return cloned
 
+    @override
     def get_name(self) -> str:
         return "SemiGradientSarsa-Linear"
 
+    @override
     def feature_fn(self, state: S, action: int) -> np.ndarray:
         """Simple feature function returning a one-hot representation
         of state and action.
@@ -109,21 +112,16 @@ class SemiGradientSarsaLinear(ApproximateTDMethod[S], Generic[S]):
         x[idx] = 1.0
         return x
 
+    @override
     def q(self, state: S, allowed_actions: np.ndarray) -> torch.Tensor:
-        # TODO: allowed?
         q_values = torch.Tensor(
             [np.dot(self.w, self.feature_fn(state, a)) for a in allowed_actions]
         )
         return q_values
 
-    def _update(self, episode: list[ReplayItem[S]], is_final: bool) -> None:
-        """Executes one update step.
-
-        Args:
-            episode: current episode up to now
-            is_final: true when episode has ended
-        """
-        if len(episode) <= 1:
+    @override
+    def update(self, episode: list[ReplayItem[S]], step: int) -> None:
+        if len(episode) <= 2:
             return
 
         prev_state = episode[len(episode) - 2]
@@ -132,21 +130,27 @@ class SemiGradientSarsaLinear(ApproximateTDMethod[S], Generic[S]):
         x = self.feature_fn(prev_state.state, prev_state.action)
         q_sa = np.dot(self.w, x)
 
-        if is_final:
-            target = prev_state.reward
-        else:
-            all_actions = np.asarray([a for a in range(self.num_actions)])
-            q_next = self.q(cur_state.state, all_actions)[cur_state.action].item()
-            target = prev_state.reward + self.env.gamma * q_next
+        all_actions = np.asarray([a for a in range(self.num_actions)])
+        q_next = self.q(cur_state.state, all_actions)[cur_state.action].item()
+        target = prev_state.reward + self.env.gamma * q_next
 
         delta = target - q_sa
         self.w += ALPHA * delta * x
 
-    def update(self, episode: list[ReplayItem[S]], step: int) -> None:
-        self._update(episode, False)
-
+    @override
     def finalize(self, episode: list[ReplayItem[S]], step: int) -> None:
-        self._update(episode, True)
+        if len(episode) <= 1:
+            return
+
+        cur_state = episode[len(episode) - 1]
+
+        x = self.feature_fn(cur_state.state, cur_state.action)
+        q_sa = np.dot(self.w, x)
+
+        target = cur_state.reward
+
+        delta = target - q_sa
+        self.w += ALPHA * delta * x
 
     def _get_save_data(self) -> Any:
         return self.w
@@ -249,33 +253,17 @@ class SemiGradientSarsaCNN(ApproximateTDMethod[S], Generic[S]):
         device: torch.device = torch.device("cpu"),
         network_class: Type[T] | None = None,
     ) -> None:
-        # print("INIT")
-        self.model = network_class(9).to(device) # TODO
-        
-        super().__init__(env, load_weights, device)
-        # print("INIT2")
-
-        # self._avg()
-
-        num_actions = self.env.get_action_space_len()
         assert network_class is not None, "network_class must be set"
 
+        num_actions = env.get_action_space_len()
+        self.model = network_class(num_actions).to(device)
         self.optimizer = torch.optim.Adam(self.model.parameters(), lr=ALPHA / 10)
         self.network_class = network_class
         self.all_actions = np.asarray([a for a in range(num_actions)])
 
-    def _avg(self):
-        total_sum = 0.0
-        total_count = 0
+        super().__init__(env, load_weights, device)
 
-        with torch.no_grad():
-            for param in self.model.parameters():
-                total_sum += param.sum().item()
-                total_count += param.numel()
-
-        avg_weight = total_sum / total_count
-        print("Average model weight:", avg_weight)
-
+    @override
     def clone(self) -> "SemiGradientSarsaCNN":
         cloned = self.__class__(
             self.env,
@@ -286,13 +274,15 @@ class SemiGradientSarsaCNN(ApproximateTDMethod[S], Generic[S]):
         cloned.model.load_state_dict(copy.deepcopy(self.model.state_dict()))
         return cloned
 
+    @override
     def get_name(self) -> str:
         return "SemiGradientSarsa-CNN"
 
+    @override
     def q(
         self,
         state: S,
-        allowed_actions: np.ndarray,  # todo: wrong
+        allowed_actions: np.ndarray,
     ) -> torch.Tensor:
         if isinstance(state, tuple):
             q_values = self.model(state[0].unsqueeze(0))
@@ -305,28 +295,27 @@ class SemiGradientSarsaCNN(ApproximateTDMethod[S], Generic[S]):
         q_masked = q_values.masked_fill(~mask, float("-inf"))
         return q_masked
 
-    def _update(self, episode: list[ReplayItem[S]], is_final: bool) -> None:
+
+    @override
+    def update(self, episode: list[ReplayItem[S]], step: int) -> None:
         """Executes one update step.
 
         Args:
             episode: current episode up to now
             is_final: true when episode has ended
         """
-        if len(episode) <= 1:
+        if len(episode) <= 2:
             return
 
-        prev_state = episode[len(episode) - 2] if not is_final else episode[len(episode) - 1]
+        prev_state = episode[len(episode) - 2]
         cur_state = episode[len(episode) - 1]
 
         q_values = self.q(prev_state.state, self.all_actions)
         q_sa = q_values[0, prev_state.action]
 
         with torch.no_grad():
-            if is_final:
-                target = torch.tensor(prev_state.reward, device=self.device)
-            else:
-                q_next = self.q(cur_state.state, self.all_actions)[0, cur_state.action]
-                target = prev_state.reward + self.env.gamma * q_next.detach()
+            q_next = self.q(cur_state.state, self.all_actions)[0, cur_state.action]
+            target = prev_state.reward + self.env.gamma * q_next.detach()
 
         loss = F.mse_loss(q_sa, target)
         self.optimizer.zero_grad()
@@ -334,21 +323,30 @@ class SemiGradientSarsaCNN(ApproximateTDMethod[S], Generic[S]):
         loss.backward()
         self.optimizer.step()
 
-    def update(self, episode: list[ReplayItem[S]], step: int) -> None:
-        self._update(episode, False)
-
     def finalize(self, episode: list[ReplayItem[S]], step: int) -> None:
-        self._update(episode, True)
+        if len(episode) <= 1:
+            return
+
+        cur_state = episode[len(episode) - 1]
+
+        q_values = self.q(cur_state.state, self.all_actions)
+        q_sa = q_values[0, cur_state.action]
+
+        with torch.no_grad():
+            target = torch.tensor(cur_state.reward, device=self.device)
+
+        loss = F.mse_loss(q_sa, target)
+        self.optimizer.zero_grad()
+
+        loss.backward()
+        self.optimizer.step()
 
     def _get_save_data(self) -> Any:
         return self.model.state_dict()
 
     def _load_weights(self, save_path: str) -> None:
-        # import ipdb
-        # ipdb.set_trace()
         with open(save_path, "rb") as f:
             state_dict = pickle.load(f)
-            print(state_dict)
             self.model.load_state_dict(state_dict)
 
 
@@ -363,14 +361,15 @@ class SemiGradientSarsaNCNN(ApproximateTDMethod[S], Generic[S]):
         network_class: Type[T] | None = None,
         n: int = 3,
     ) -> None:
-        super().__init__(env, load_weights, device)
-
-        self.num_actions = self.env.get_action_space_len()
         assert network_class is not None, "network_class must be set"
+
+        self.num_actions = env.get_action_space_len()
         self.model = network_class(self.num_actions).to(device)
         self.optimizer = torch.optim.Adam(self.model.parameters(), lr=ALPHA / 10)
         self.network_class = network_class
         self.n = n
+
+        super().__init__(env, load_weights, device)
 
     def clone(self) -> "SemiGradientSarsaNCNN":
         cloned = self.__class__(
@@ -393,6 +392,7 @@ class SemiGradientSarsaNCNN(ApproximateTDMethod[S], Generic[S]):
             q_values = self.model(state.unsqueeze(0))
         else:
             raise ValueError(f"Got unexpected type {type(state)}")
+        
         mask = torch.zeros_like(q_values).bool()
         mask[:, allowed_actions] = 1.0
         q_masked = q_values.masked_fill(~mask, float("-inf"))
@@ -409,12 +409,10 @@ class SemiGradientSarsaNCNN(ApproximateTDMethod[S], Generic[S]):
             episode: current episode up to now
             tau: current timestep to update
         """
-        is_final = True
         if tau is None:
             # tau is set when finalizing the episode - otherwise pick
             # the correct update step here.
             tau = len(episode) - self.n - 1
-            is_final = False
 
         if tau >= 0:
             all_actions = np.asarray([a for a in range(self.num_actions)])
@@ -426,7 +424,8 @@ class SemiGradientSarsaNCNN(ApproximateTDMethod[S], Generic[S]):
                     ]
                 )
                 G_torch = torch.tensor(G, dtype=torch.float32, device=self.device)
-                if not is_final:
+
+                if tau + self.n < len(episode):
                     G_torch = (
                         G_torch
                         + self.env.gamma**self.n
@@ -450,7 +449,7 @@ class SemiGradientSarsaNCNN(ApproximateTDMethod[S], Generic[S]):
     def finalize(self, episode: list[ReplayItem[S]], step: int) -> None:
         # Replay has terminated - still finish updating the values
         # by going over the remaining episode.
-        for tau in range(len(episode) - self.n - 1, len(episode)):
+        for tau in range(len(episode) - self.n, len(episode)):
             self._update(episode, tau)
 
     def _get_save_data(self) -> Any:
@@ -459,11 +458,3 @@ class SemiGradientSarsaNCNN(ApproximateTDMethod[S], Generic[S]):
     def _load_weights(self, save_path: str) -> None:
         state_dict = torch.load(save_path, map_location=self.device)
         self.model.load_state_dict(state_dict)
-
-
-# RUNS:
-# - set ticks!
-# 5, 26: new methods
-# 10, 50: best methods: prob. previous best methods + SarsaCNN
-# Then show how much SarsaCNN can be scaled, e.g. up to 100, ... - maybe first another run with other best-performing methods
-# Maybe change receptive field
