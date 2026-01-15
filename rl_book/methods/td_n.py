@@ -1,4 +1,5 @@
 from collections import defaultdict
+from typing import override
 
 import numpy as np
 import torch
@@ -19,20 +20,15 @@ class SarsaN(TDMethod):
         device: torch.device = torch.device("cpu"),
         n: int = 3,
     ) -> None:
-        super().__init__(env, load_weights, device)
         self.n = n
+        super().__init__(env, load_weights, device)
 
+    @override
     def get_name(self) -> str:
         return "SarsaN"
 
-    def finalize(self, episode: list[ReplayItem[int]], step: int) -> None:
-        # Replay has terminated - still finish updating the values
-        # by going over the remaining episode.
-        for tau in range(len(episode) - self.n - 1, len(episode)):
-            self.update(episode, step, tau)
-
-    def update(
-        self, episode: list[ReplayItem[int]], step: int, tau: int | None = None # TODO signautre?
+    def _update(
+        self, episode: list[ReplayItem[int]], tau: int | None = None
     ) -> None:
         is_final = True
         if tau is None:
@@ -63,6 +59,21 @@ class SarsaN(TDMethod):
             self.Q[episode[tau].state, episode[tau].action] = self.Q[
                 episode[tau].state, episode[tau].action
             ] + ALPHA * (G - self.Q[episode[tau].state, episode[tau].action])
+
+    @override
+    def update(
+        self, episode: list[ReplayItem[int]], step: int
+    ) -> None:
+        self._update(episode, None)
+
+    @override
+    def finalize(self, episode: list[ReplayItem[int]], step: int) -> None:
+        # Replay has terminated - still finish updating the values
+        # by going over the remaining episode.
+        for tau in range(len(episode) - self.n - 1, len(episode)):
+            self._update(episode, tau)
+
+   
 
 
 class TreeN(TDMethod):

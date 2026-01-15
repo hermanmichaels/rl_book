@@ -190,10 +190,14 @@ class CNNTicTacToe(nn.Module):
     def __init__(self, num_actions: int) -> None:
         super().__init__()
 
-        self.conv1 = nn.Conv2d(2, 16, kernel_size=2, padding=0)
-        self.conv2 = nn.Conv2d(16, 32, kernel_size=2, padding=0)
-        self.pool = nn.AdaptiveAvgPool2d(1)
-        self.fc = nn.Linear(32, num_actions)  # 32
+        self.net = nn.Sequential(
+            nn.Flatten(),
+            nn.Linear(18, 64),
+            nn.ReLU(),
+            nn.Linear(64, 64),
+            nn.ReLU(),
+            nn.Linear(64, num_actions),
+        )
 
     def forward(self, x: torch.Tensor):
         """Forward call.
@@ -204,12 +208,7 @@ class CNNTicTacToe(nn.Module):
         Returns:
             Q values [bs, num_actions]
         """
-        x = F.relu(self.conv1(x))
-        x = F.relu(self.conv2(x))
-        x = self.pool(x)
-        x = x.view(x.size(0), -1)
-        x = self.fc(x)
-        return x
+        return self.net(x)
 
 
 
@@ -316,7 +315,7 @@ class SemiGradientSarsaCNN(ApproximateTDMethod[S], Generic[S]):
         if len(episode) <= 1:
             return
 
-        prev_state = episode[len(episode) - 2]
+        prev_state = episode[len(episode) - 2] if not is_final else episode[len(episode) - 1]
         cur_state = episode[len(episode) - 1]
 
         q_values = self.q(prev_state.state, self.all_actions)

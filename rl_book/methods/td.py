@@ -3,7 +3,7 @@ import pickle
 import random
 from abc import ABC
 from collections import defaultdict
-from typing import Any, DefaultDict
+from typing import Any, DefaultDict, override
 
 import numpy as np
 import torch
@@ -22,19 +22,22 @@ class TDMethod(RLMethod[int], ABC):
         load_weights: bool = False,
         device: torch.device = torch.device("cpu"),
     ) -> None:
-        super().__init__(env, load_weights, device)
         self.Q: DefaultDict[tuple[int, int], float] = defaultdict(float)
 
+        super().__init__(env, load_weights, device)
+
+    @override
     def clone(self) -> "TDMethod":
         cloned = self.__class__(self.env, False)
         cloned.Q = copy.deepcopy(self.Q)
         return cloned
 
+    @override
     def act(
         self, state: int, step: int | None = None, mask: np.ndarray | list = []
     ) -> int:
         allowed_actions = self.get_allowed_actions(mask)
-        if self._train and step and random.uniform(0, 1) < self.env.eps(step):
+        if self._train and step is not None and random.uniform(0, 1) < self.env.eps(step):
             return random.choice(allowed_actions)
         else:
             q_values = [self.Q[state, a] for a in allowed_actions]
@@ -42,67 +45,87 @@ class TDMethod(RLMethod[int], ABC):
             max_actions = [a for a, q in zip(allowed_actions, q_values) if q == max_q]
             return random.choice(max_actions)
 
+    @override
     def _get_save_data(self) -> Any:
         return self.Q
 
+    @override
     def _load_weights(self, save_path: str) -> None:
         with open(save_path, "rb") as f:
             self.Q = pickle.load(f)
 
 
 class Sarsa(TDMethod):
+    @override
     def get_name(self) -> str:
         return "Sarsa"
 
-    def update(self, episode: list[ReplayItem[int]], is_final: bool) -> None:
-        if len(episode) <= 1:
+    @override
+    def update(self, episode: list[ReplayItem[int]], step: int) -> None:
+        if len(episode) <= 2:
             return
 
         prev_state = episode[len(episode) - 2]
         cur_state = episode[len(episode) - 1]
 
-        target =  float(prev_state.reward) + self.env.gamma * self.Q[cur_state.state, cur_state.action] if not is_final else float(prev_state.reward)
-        self.Q[prev_state.state, prev_state.action] = self.Q[
-            prev_state.state, prev_state.action
-        ] + ALPHA * (
-            target
+        self.Q[prev_state.state, prev_state.action] += ALPHA * (
+            float(prev_state.reward) + self.env.gamma * self.Q[cur_state.state, cur_state.action]
             - self.Q[prev_state.state, prev_state.action]
-        )
+        )        
 
+    @override
     def finalize(self, episode: list[ReplayItem[int]], step: int) -> None:
-        self.update(episode, is_final=True)
+        if len(episode) <= 1:
+            return
+
+        cur_state = episode[len(episode) - 1]
+
+        self.Q[cur_state.state, cur_state.action] += ALPHA * (
+            float(cur_state.reward)
+            - self.Q[cur_state.state, cur_state.action]
+        )    
 
 
 class QLearning(TDMethod):
+    @override
     def get_name(self) -> str:
         return "QLearning"
 
-    def update(self, episode: list[ReplayItem[int]], is_final: bool) -> None:
-        if len(episode) <= 1:
+    @override
+    def update(self, episode: list[ReplayItem[int]], step: int) -> None:
+        if len(episode) <= 2:
             return
 
         cur_state = episode[len(episode) - 2]
         next_state = episode[len(episode) - 1]
 
-        allowed_actions = self.get_allowed_actions(cur_state.mask)
+        allowed_actions = self.get_allowed_actions(next_state.mask)
         next_q = max(
             [self.Q[next_state.state, a_] for a_ in allowed_actions],
             default=0,
-        ) if not is_final else 0
+        )
 
-        self.Q[cur_state.state, cur_state.action] = self.Q[
-            cur_state.state, cur_state.action
-        ] + ALPHA * (
+        self.Q[cur_state.state, cur_state.action] += ALPHA * (
             cur_state.reward
             + self.env.gamma * next_q
             - self.Q[cur_state.state, cur_state.action]
         )
 
+    @override
     def finalize(self, episode: list[ReplayItem[int]], step: int) -> None:
-        self.update(episode, True)
+        if len(episode) <= 1:
+            return
+
+        cur_state = episode[len(episode) - 1]
+
+        self.Q[cur_state.state, cur_state.action] += ALPHA * (
+            cur_state.reward
+            - self.Q[cur_state.state, cur_state.action]
+        )
 
 
 class ExpectedSarsa(TDMethod):
+    @override
     def get_name(self) -> str:
         return "ExpectedSarsa"
 
@@ -111,8 +134,9 @@ class ExpectedSarsa(TDMethod):
         probs = np.exp(probs - np.max(probs))
         return probs[action] / sum(probs)
 
-    def update(self, episode: list[ReplayItem[int]], is_final: bool) -> None:
-        if len(episode) <= 1:
+    @override
+    def update(self, episode: list[ReplayItem[int]], step: int) -> None:
+        if len(episode) <= 2:
             return
 
         cur_state = episode[len(episode) - 2]
@@ -122,23 +146,31 @@ class ExpectedSarsa(TDMethod):
             cur_state.reward - self.Q[cur_state.state, cur_state.action]
         )
 
-        if not is_final:
-            actions = self.get_allowed_actions(next_state.mask)
-            for a in actions:
-                updated_q_value += (
-                    self.env.gamma
-                    * ALPHA
-                    * self._get_action_prob(next_state.state, a)
-                    * self.Q[next_state.state, a]
-                )
+        actions = self.get_allowed_actions(next_state.mask)
+        for a in actions:
+            updated_q_value += (
+                self.env.gamma
+                * ALPHA
+                * self._get_action_prob(next_state.state, a)
+                * self.Q[next_state.state, a]
+            )
 
         self.Q[cur_state.state, cur_state.action] = updated_q_value
 
+    @override
     def finalize(self, episode: list[ReplayItem[int]], step: int) -> None:
-        self.update(episode, True)
+        if len(episode) <= 1:
+            return
+
+        cur_state = episode[len(episode) - 1]
+
+        self.Q[cur_state.state, cur_state.action] += + ALPHA * (
+            cur_state.reward - self.Q[cur_state.state, cur_state.action]
+        )
 
 
 class DoubleQ(TDMethod):
+    @override
     def get_name(self) -> str:
         return "DoubleQ"
 
@@ -148,61 +180,58 @@ class DoubleQ(TDMethod):
         load_weights: bool = False,
         device: torch.device = torch.device("cpu"),
     ) -> None:
-        super().__init__(env, load_weights, device)
         self.Q_2: DefaultDict[tuple[int, int], float] = defaultdict(float)
+        
+        super().__init__(env, load_weights, device)
 
-    def update(self, episode: list[ReplayItem[int]], is_final: bool) -> None:
-        if len(episode) <= 1:
+    def _update(self, Q1, Q2, cur_state, next_state):
+        if next_state:
+            allowed_actions = self.get_allowed_actions(next_state.mask)
+            max_a = allowed_actions[
+                np.argmax(
+                    [Q1[next_state.state, a] for a in allowed_actions],
+                )
+            ]
+            next_q = self.env.gamma * Q2[next_state.state, max_a]
+        else:
+            next_q = 0
+      
+        Q1[cur_state.state, cur_state.action] += ALPHA * (
+            cur_state.reward
+            + next_q
+            - Q1[cur_state.state, cur_state.action]
+        )
+
+    @override
+    def update(self, episode: list[ReplayItem[int]], step: int) -> None:
+        if len(episode) <= 2:
             return
 
         cur_state = episode[len(episode) - 2]
         next_state = episode[len(episode) - 1]
 
-        allowed_actions = self.get_allowed_actions(cur_state.mask)
+        if random.random() < 0.5:
+            self._update(self.Q, self.Q_2, cur_state, next_state)
+        else:
+            self._update(self.Q_2, self.Q, cur_state, next_state)
+
+    @override
+    def finalize(self, episode: list[ReplayItem[int]], step: int) -> None:
+        if len(episode) <= 1:
+            return
+
+        cur_state = episode[len(episode) - 1]
 
         if random.randint(0, 100) < 50:
-            if not is_final:
-                max_a = allowed_actions[
-                    np.argmax(
-                        [self.Q[next_state.state, a] for a in allowed_actions],
-                    )
-                ]
-                next_q = self.env.gamma * self.Q_2[next_state.state, max_a]
-            else:
-                next_q = 0
-
-            self.Q[cur_state.state, cur_state.action] = self.Q[
-                cur_state.state, cur_state.action
-            ] + ALPHA * (
-                cur_state.reward
-                + next_q
-                - self.Q[cur_state.state, cur_state.action]
-            )
+            self._update(self.Q, self.Q_2, cur_state, None)
         else:
-            if not is_final:
-                max_a = allowed_actions[
-                    np.argmax(
-                        [self.Q_2[next_state.state, a] for a in allowed_actions],
-                    )
-                ]
-                next_q = self.env.gamma * self.Q[next_state.state, max_a]
-            else:
-                next_q = 0
-                
-            self.Q_2[cur_state.state, cur_state.action] = self.Q_2[
-                cur_state.state, cur_state.action
-            ] + ALPHA * (
-                cur_state.reward
-                + next_q
-                - self.Q_2[cur_state.state, cur_state.action]
-            )
+            self._update(self.Q_2, self.Q, cur_state, None)
 
-    def finalize(self, episode: list[ReplayItem[int]], step: int) -> None:
-        self.update(episode, True)
-
+    @override
     def _get_save_data(self) -> Any:
         return self.Q, self.Q_2
 
+    @override
     def _load_weights(self, save_path: str) -> None:
         with open(save_path, "rb") as f:
             self.Q, self.Q_2 = pickle.load(f)

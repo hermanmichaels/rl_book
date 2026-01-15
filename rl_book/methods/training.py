@@ -182,9 +182,25 @@ def train_multi_player(
             ):
                 s, a, mask = state_dict[env.players[player_pos]]
 
+
+                observation_new = env.env.observe(  # type: ignore
+                    env.players[player_pos]
+                )
+
                 episode.append(ReplayItem(s, a, float(reward), mask))
 
                 methods[method_idx].method.update(episode, step)
+
+        # episode.append(
+        #     ReplayItem(
+        #         env.obs_to_state(
+        #             observation_new["observation"], player_pos
+        #         ),  # type: ignore
+        #         -1,
+        #         0,
+        #         [],
+        #     )
+        # )
 
         methods[method_idx].method.finalize(episode, step)
 
