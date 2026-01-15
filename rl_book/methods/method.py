@@ -5,7 +5,7 @@ from typing import Any, Generic, TypeVar
 
 import numpy as np
 
-from rl_book.env import GameResult, ParametrizedEnv
+from rl_book.env import GameResult, ObsMode, ParametrizedEnv
 from rl_book.replay_utils import ReplayItem
 
 SAVE_PATH = "weights/"
@@ -114,12 +114,13 @@ class MethodWithStats:
     """Wrapper around RLMethod which keeps track of win / lose stats for
     multi-player games."""
 
-    def __init__(self, method: RLMethod) -> None:
+    def __init__(self, method: RLMethod, obs_mode = ObsMode.DEFAULT) -> None:
         self.method = method
         self.wins = 0
         self.draws = 0
         self.losses = 0
         self.picks = 0
+        self.obs_mode = obs_mode # TODO: move to method?
 
     def update_pick(self) -> None:
         self.picks += 1
@@ -147,4 +148,5 @@ class MethodWithStats:
         cloned = MethodWithStats(self.method.clone())
         cloned.wins = self.wins
         cloned.picks = self.picks
+        cloned.obs_mode=self.obs_mode
         return cloned
