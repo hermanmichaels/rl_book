@@ -35,25 +35,25 @@ def benchmark_multi_player(env_name: str, load_weights: bool, device: torch.devi
     methods = [
         MethodWithStats(Random(env)),
         MethodWithStats(OnPolicyMC(env, load_weights=load_weights)),
-        MethodWithStats(OffPolicyMC(env, load_weights=load_weights)),
+        # MethodWithStats(OffPolicyMC(env, load_weights=load_weights)),
         MethodWithStats(QLearning(env, load_weights=load_weights)),
-        MethodWithStats(Sarsa(env, load_weights=load_weights)),
-        MethodWithStats(ExpectedSarsa(env, load_weights=load_weights)),
-        MethodWithStats(DoubleQ(env, load_weights=load_weights)),
-        MethodWithStats(SarsaN(env, load_weights=load_weights)),
-        MethodWithStats(TreeN(env, load_weights=load_weights)),
-        MethodWithStats(DynaQ(env, load_weights=load_weights)),
+        # MethodWithStats(Sarsa(env, load_weights=load_weights)),
+        # MethodWithStats(ExpectedSarsa(env, load_weights=load_weights)),
+        # MethodWithStats(DoubleQ(env, load_weights=load_weights)),
+        # MethodWithStats(SarsaN(env, load_weights=load_weights)),
+        # MethodWithStats(TreeN(env, load_weights=load_weights)),
+        # MethodWithStats(DynaQ(env, load_weights=load_weights)),
         # MethodWithStats(SemiGradientSarsaLinear(env, load_weights=load_weights)),
         MethodWithStats(SemiGradientSarsaCNN(env, load_weights=load_weights, network_class=network_class, device=device), obs_mode=ObsMode.RASTERIZED),
         MethodWithStats(SemiGradientSarsaNCNN(env, load_weights=load_weights, network_class=network_class, device=device), obs_mode=ObsMode.RASTERIZED)
     ]
     zoo = [MethodWithStats(Random(env))]
     # Train given methods
-    train_multi_player(env, methods, zoo, max_steps=100000, plot_interval=1000)
+    train_multi_player(env, methods, zoo, max_steps=30000, plot_interval=1000)
 
     # Now give user chance to play against one of the methods
     # TOOD: need good wrapper from action to input
-    env = get_env(env_name, "human")
+    env = get_env(env_name, device, "human")
     test_against_user(env, methods[1].method)
 
 
