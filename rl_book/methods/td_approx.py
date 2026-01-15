@@ -35,13 +35,17 @@ class ApproximateTDMethod(RLMethod[int | tuple[torch.Tensor, int]], ABC):
         if self._train and step and random.uniform(0, 1) < self.env.eps(step):
             return random.choice(allowed_actions)
         else:
+            all_actions = self.get_allowed_actions([])
             q_values = self.q(state, allowed_actions)
             # Sample uniformly in case of ties
             max_q = q_values.max()
             probs = (q_values == max_q).float()
             probs /= probs.sum()
             chosen_idx: int = int(torch.multinomial(probs, 1).item())
-            return allowed_actions[chosen_idx]
+            if chosen_idx >= len(all_actions):
+                import ipdb
+                ipdb.set_trace()
+            return all_actions[chosen_idx]
 
     def _get_save_data(self) -> Any:
         pass
@@ -102,6 +106,7 @@ class SemiGradientSarsaLinear(ApproximateTDMethod):
     def q(
         self, state: int | tuple[torch.Tensor, int], allowed_actions: np.ndarray
     ) -> torch.Tensor:
+        # TODO: allowed?
         q_values = torch.Tensor(
             [np.dot(self.w, self.feature_fn(state, a)) for a in allowed_actions]
         )
@@ -162,7 +167,7 @@ class GridWorldCNN(nn.Module):
         self.conv1 = nn.Conv2d(in_channels, 16, kernel_size=2, padding=0)
         self.conv2 = nn.Conv2d(16, 32, kernel_size=2, padding=0)
         self.pool = nn.AdaptiveAvgPool2d(1)
-        self.fc = nn.Linear(32, num_actions)
+        self.fc = nn.Linear(16, num_actions) # 32
 
     def forward(self, x: torch.Tensor):
         """Forward call.
@@ -174,7 +179,7 @@ class GridWorldCNN(nn.Module):
             Q values [bs, num_actions]
         """
         x = F.relu(self.conv1(x))
-        x = F.relu(self.conv2(x))
+        # x = F.relu(self.conv2(x))
         x = self.pool(x)
         x = x.view(x.size(0), -1)
         x = self.fc(x)
@@ -191,7 +196,7 @@ class SemiGradientSarsaCNN(ApproximateTDMethod):
         super().__init__(env, load_weights)
 
         num_channels = 3
-        num_actions = 4
+        num_actions = 9 # 4 TODO
         self.model = GridWorldCNN(num_channels, num_actions).to(device)
         self.optimizer = torch.optim.Adam(self.model.parameters(), lr=ALPHA / 10)
         self.device = device
@@ -243,10 +248,11 @@ class SemiGradientSarsaCNN(ApproximateTDMethod):
                 ]
                 target = (
                     prev_state.reward + self.env.gamma * q_next.detach()
-                )  # TODO: step
+                )
 
         loss = F.mse_loss(q_sa, target)
         self.optimizer.zero_grad()
+
         loss.backward()
         self.optimizer.step()
 
@@ -279,7 +285,7 @@ class SemiGradientSarsaNCNN(ApproximateTDMethod):
         super().__init__(env, load_weights)
 
         num_channels = 3
-        self.num_actions = 4
+        self.num_actions = 9 # TODO
         self.model = GridWorldCNN(num_channels, self.num_actions).to(device)
         self.optimizer = torch.optim.Adam(self.model.parameters(), lr=ALPHA / 10)
         self.device = device
@@ -311,7 +317,7 @@ class SemiGradientSarsaNCNN(ApproximateTDMethod):
 
         Args:
             episode: current episode up to now
-            is_final: true when episode has ended
+            tau: current timestep to update
         """
         is_final = True
         if tau is None:
@@ -367,3 +373,10 @@ class SemiGradientSarsaNCNN(ApproximateTDMethod):
     def _load_weights(self, save_path: str) -> None:
         state_dict = torch.load(save_path, map_location=self.device)
         self.model.load_state_dict(state_dict)
+
+# RUNS:
+# - set ticks!
+# 5, 26: new methods
+# 10, 50: best methods: prob. previous best methods + SarsaCNN
+# Then show how much SarsaCNN can be scaled, e.g. up to 100, ... - maybe first another run with other best-performing methods
+# Maybe change receptive field

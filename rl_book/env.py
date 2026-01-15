@@ -6,6 +6,7 @@ import numpy as np
 import torch
 from gymnasium.core import Env
 from gymnasium.spaces import Box, Discrete
+from pettingzoo.utils.wrappers import BaseWrapper
 
 
 # Toggle different observation "modes", such as
@@ -237,29 +238,34 @@ class MultiPlayerEnv(ParametrizedEnv):
 class TicTacToeEnv(MultiPlayerEnv):
     """TicTacToe env."""
 
-    def __init__(self, env: Env, gamma=0.95):
+    def __init__(self, env: Env, gamma=0.95, obs_mode: ObsMode = ObsMode.DEFAULT, device=torch.device("cpu")):
         super().__init__(env, gamma, ["player_1", "player_2"])
+        self.obs_mode = obs_mode
+        self.device = device
 
     def obs_to_state(self, obs: Any, start_pos: int = 0) -> int:
-        board = obs  # shape: (3, 3, 2)
-        state_flat = []
+        if self.obs_mode == ObsMode.DEFAULT:
+            board = obs  # shape: (3, 3, 2)
+            state_flat = []
 
-        for row in range(3):
-            for col in range(3):
-                if board[row][col][0] == 1:
-                    state_flat.append(1)  # player 1
-                elif board[row][col][1] == 1:
-                    state_flat.append(2)  # player 2
-                else:
-                    state_flat.append(0)  # empty
+            for row in range(3):
+                for col in range(3):
+                    if board[row][col][0] == 1:
+                        state_flat.append(1)  # player 1
+                    elif board[row][col][1] == 1:
+                        state_flat.append(2)  # player 2
+                    else:
+                        state_flat.append(0)  # empty
 
-        state_flat.append(start_pos)
+            state_flat.append(start_pos)
 
-        # Convert base-3 list to integer
-        state = 0
-        for i, val in enumerate(state_flat):
-            state += val * (3**i)
-        return state
+            # Convert base-3 list to integer
+            state = 0
+            for i, val in enumerate(state_flat):
+                state += val * (3**i)
+            return state
+        elif self.obs_mode == ObsMode.RASTERIZED:
+            return torch.as_tensor(np.transpose(obs, [0, 1, 2]), device=self.device).float(), 0 # TODO: to satisfy
 
     def get_game_result(self, reward: float) -> GameResult:
         if reward == 1:

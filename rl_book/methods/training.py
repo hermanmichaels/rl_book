@@ -148,7 +148,7 @@ def train_multi_player(
                     env.players[player_pos]
                 )
 
-                episode.append(ReplayItem(s, a, reward, mask))
+                episode.append(ReplayItem(s, a, float(reward), mask))
 
                 methods[method_idx].method.update(episode, step)
 
