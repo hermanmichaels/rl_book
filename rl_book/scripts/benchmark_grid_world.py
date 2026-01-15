@@ -10,12 +10,9 @@ from rl_book.methods.mc import OffPolicyMC, OnPolicyMC
 from rl_book.methods.method import RLMethod
 from rl_book.methods.planning import DynaQ
 from rl_book.methods.td import DoubleQ, ExpectedSarsa, QLearning, Sarsa
-from rl_book.methods.td_approx import (
-    GridWorldCNN,
-    SemiGradientSarsaCNN,
-    SemiGradientSarsaLinear,
-    SemiGradientSarsaNCNN,
-)
+from rl_book.methods.td_approx import (GridWorldCNN, SemiGradientSarsaCNN,
+                                       SemiGradientSarsaLinear,
+                                       SemiGradientSarsaNCNN)
 from rl_book.methods.td_n import SarsaN, TreeN
 from rl_book.methods.training import train_single_player
 
@@ -67,11 +64,9 @@ def success_callback(method: RLMethod, step: int, env: Env) -> bool:
 def plot_results(
     needed_steps: list[list[int]],
     methods: list[type[RLMethod]],
-    min_grid_size: int,
-    max_grid_size: int,
+    x_values: list[int],
     fig_path: str,
 ) -> None:
-    x_values = [n for n in range(min_grid_size, max_grid_size)]
     markers = ["o", "s", "^", "*"]
 
     for idx, y_values in enumerate(needed_steps):
@@ -93,7 +88,7 @@ def plot_results(
 def benchmark(
     methods: list[type[RLMethod]],
     min_grid_size=5,
-    max_grid_size=6,
+    max_grid_size=7,
     extra_rewards: bool = True,
     eps_decay: bool = True,
     fig_path: str = "result.png",
@@ -111,8 +106,10 @@ def benchmark(
     steps_needed: list[list[int]] = [[] for _ in range(len(methods))]
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
+    ns = [5, 15, 25] # range(min_grid_size, max_grid_size)
+
     # Iterate over all possible grid sizes.
-    for n in range(min_grid_size, max_grid_size):
+    for n in ns:
         start = time.time()
         # Iterate over all methods.
         for idx, method_ in enumerate(methods):
@@ -154,7 +151,7 @@ def benchmark(
 
         print(f"Finished benchmarking grid size {n} x {n} in {time.time() - start}s")
 
-    plot_results(steps_needed, methods, min_grid_size, max_grid_size, fig_path)
+    plot_results(steps_needed, methods, ns, fig_path)
 
 
 if __name__ == "__main__":

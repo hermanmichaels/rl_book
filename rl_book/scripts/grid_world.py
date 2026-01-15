@@ -1,22 +1,19 @@
 import argparse
-from functools import partial
 
 import gymnasium as gym
 import torch
 
-from rl_book.env import GridWorldImageWrapper, ObsMode, generate_random_grid_world_env
+from rl_book.env import (GridWorldImageWrapper, ObsMode,
+                         generate_random_grid_world_env)
 from rl_book.methods.dp import policy_iteration, value_iteration
 from rl_book.methods.inference import test_single_player
 from rl_book.methods.mc import OffPolicyMC, OnPolicyMC
 from rl_book.methods.method import RLMethod
 from rl_book.methods.planning import DynaQ
 from rl_book.methods.td import DoubleQ, ExpectedSarsa, QLearning, Sarsa
-from rl_book.methods.td_approx import (
-    GridWorldCNN,
-    SemiGradientSarsaCNN,
-    SemiGradientSarsaLinear,
-    SemiGradientSarsaNCNN,
-)
+from rl_book.methods.td_approx import (GridWorldCNN, SemiGradientSarsaCNN,
+                                       SemiGradientSarsaLinear,
+                                       SemiGradientSarsaNCNN)
 from rl_book.methods.td_n import SarsaN, TreeN
 from rl_book.methods.training import train_single_player
 

@@ -10,12 +10,12 @@ authors = ["hermanmichaels <hrmnmichaels@gmail.com>"]
 
 [tool.poetry.dependencies]
 python = "3.12.12"
-matplotlib = "3.5.1"
+matplotlib = "3.9"
 mypy = "1.15"
 numpy = "2.1"
 black = "22.3.0"
 ipdb = "0.13.13"
-flake8 = "4.0.1"
+flake8 = "7.0.0"
 isort = "^5.10.1"
 pygame = "2.6.0"
 torch = "2.3.1"

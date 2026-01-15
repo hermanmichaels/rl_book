@@ -88,7 +88,7 @@ class ParametrizedEnv(Generic[S]):
         self.gamma = gamma
         self.eps_end: float = 0.05
         self.eps_start: float = 0.9  # TOOD: 1 crashes with MC
-        self.num_decay_steps: int = 1000
+        self.num_decay_steps: int = 10000
         self.eps_decay = eps_decay
 
     def eps(self, step: int) -> float:
@@ -356,8 +356,10 @@ class TicTacToeEnv(MultiPlayerEnv[int | torch.Tensor]):
         _________\n\
         2 | 5 | 8"
 
+
 def save_connect4_obs(obs, filename="connect4_obs.png"):
     import matplotlib.pyplot as plt
+
     """
     obs: torch.Tensor or np.ndarray, shape [C, H, W]
          channel 0 = current player
@@ -371,7 +373,7 @@ def save_connect4_obs(obs, filename="connect4_obs.png"):
     # -1  = opponent
     # import ipdb
     # ipdb.set_trace()
-    board = obs[..., 0] - obs[..., 1]   # shape [H, W]
+    board = obs[..., 0] - obs[..., 1]  # shape [H, W]
 
     plt.figure(figsize=(7, 6))
     plt.imshow(board, cmap="coolwarm", vmin=-1, vmax=1)
@@ -383,6 +385,7 @@ def save_connect4_obs(obs, filename="connect4_obs.png"):
     plt.tight_layout()
     plt.savefig(filename)
     plt.close()
+
 
 class ConnectFourEnv(MultiPlayerEnv[int | torch.Tensor]):
     """ConnectFour env."""
@@ -409,7 +412,7 @@ class ConnectFourEnv(MultiPlayerEnv[int | torch.Tensor]):
                     else:
                         state_flat.append(0)  # empty
 
-            state_flat.append(start_pos) # TODO: remove!
+            state_flat.append(start_pos)  # TODO: remove!
 
             # Convert to base-3 integer
             state_encoded = 0

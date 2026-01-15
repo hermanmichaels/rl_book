@@ -76,6 +76,15 @@ class RLMethod(Generic[S], ABC):
         cloned = self.__class__(self.env, device=self.device)
         return cloned
 
+    def _is_empty_mask(self, mask) -> bool:
+        if mask is None:
+            return True
+
+        if isinstance(mask, np.ndarray):
+            return mask.size == 0
+
+        return len(mask) == 0
+
     def get_allowed_actions(self, mask: np.ndarray | list) -> np.ndarray:
         """Gets the allowed action indices.
 
@@ -87,7 +96,7 @@ class RLMethod(Generic[S], ABC):
         """
         return (
             np.nonzero(mask)[0].tolist()
-            if mask != []
+            if not self._is_empty_mask(mask)
             else np.asarray([a for a in range(self.env.get_action_space_len())])
         )
 

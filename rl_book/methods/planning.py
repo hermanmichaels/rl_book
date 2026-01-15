@@ -66,14 +66,18 @@ class DynaQ(RLMethod[int]):
     @override
     def act(self, state: int, step: int | None = None, mask: np.ndarray | list = []):
         allowed_actions = self.get_allowed_actions(mask)
-        if self._train and step is not None and random.uniform(0, 1) < self.env.eps(step):
+        if (
+            self._train
+            and step is not None
+            and random.uniform(0, 1) < self.env.eps(step)
+        ):
             return random.choice(allowed_actions)
         else:
             q_values = [self.Q[state, a] for a in allowed_actions]
             max_q = max(q_values)
             max_actions = [a for a, q in zip(allowed_actions, q_values) if q == max_q]
             return random.choice(max_actions)
-        
+
     def _learn(self, step: int) -> None:
         kappa = 0.1
 
@@ -94,10 +98,12 @@ class DynaQ(RLMethod[int]):
                 (float(reward) + bonus_reward)
                 + self.env.gamma * next_q
                 - self.Q[observation, action]
-            )    
+            )
 
     @override
-    def update(self, episode: list[ReplayItem[int]], step: int) -> None: # TODO: signtuare
+    def update(
+        self, episode: list[ReplayItem[int]], step: int
+    ) -> None:  # TODO: signtuare
         if len(episode) <= 2:
             return
 
@@ -119,7 +125,7 @@ class DynaQ(RLMethod[int]):
             + self.env.gamma * next_q
             - self.Q[cur_state.state, cur_state.action]
         )
-    
+
         self.model[cur_state.state, cur_state.action] = (
             next_state.state,
             cur_state.reward,
@@ -129,7 +135,6 @@ class DynaQ(RLMethod[int]):
 
         self._learn(step)
 
-
     def finalize(self, episode: list[ReplayItem[int]], step: int) -> None:
         if len(episode) <= 1:
             return
@@ -137,12 +142,10 @@ class DynaQ(RLMethod[int]):
         cur_state = episode[len(episode) - 1]
 
         self.Q[cur_state.state, cur_state.action] += ALPHA * (
-            cur_state.reward
-            - self.Q[cur_state.state, cur_state.action]
+            cur_state.reward - self.Q[cur_state.state, cur_state.action]
         )
 
         self._learn(step)
-
 
     def _get_save_data(self) -> Any:
         return self.Q, self.model

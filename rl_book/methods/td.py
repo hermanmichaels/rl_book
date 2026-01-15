@@ -37,7 +37,11 @@ class TDMethod(RLMethod[int], ABC):
         self, state: int, step: int | None = None, mask: np.ndarray | list = []
     ) -> int:
         allowed_actions = self.get_allowed_actions(mask)
-        if self._train and step is not None and random.uniform(0, 1) < self.env.eps(step):
+        if (
+            self._train
+            and step is not None
+            and random.uniform(0, 1) < self.env.eps(step)
+        ):
             return random.choice(allowed_actions)
         else:
             q_values = [self.Q[state, a] for a in allowed_actions]
@@ -69,9 +73,10 @@ class Sarsa(TDMethod):
         cur_state = episode[len(episode) - 1]
 
         self.Q[prev_state.state, prev_state.action] += ALPHA * (
-            float(prev_state.reward) + self.env.gamma * self.Q[cur_state.state, cur_state.action]
+            float(prev_state.reward)
+            + self.env.gamma * self.Q[cur_state.state, cur_state.action]
             - self.Q[prev_state.state, prev_state.action]
-        )        
+        )
 
     @override
     def finalize(self, episode: list[ReplayItem[int]], step: int) -> None:
@@ -81,9 +86,8 @@ class Sarsa(TDMethod):
         cur_state = episode[len(episode) - 1]
 
         self.Q[cur_state.state, cur_state.action] += ALPHA * (
-            float(cur_state.reward)
-            - self.Q[cur_state.state, cur_state.action]
-        )    
+            float(cur_state.reward) - self.Q[cur_state.state, cur_state.action]
+        )
 
 
 class QLearning(TDMethod):
@@ -119,8 +123,7 @@ class QLearning(TDMethod):
         cur_state = episode[len(episode) - 1]
 
         self.Q[cur_state.state, cur_state.action] += ALPHA * (
-            cur_state.reward
-            - self.Q[cur_state.state, cur_state.action]
+            cur_state.reward - self.Q[cur_state.state, cur_state.action]
         )
 
 
@@ -164,7 +167,7 @@ class ExpectedSarsa(TDMethod):
 
         cur_state = episode[len(episode) - 1]
 
-        self.Q[cur_state.state, cur_state.action] += + ALPHA * (
+        self.Q[cur_state.state, cur_state.action] += +ALPHA * (
             cur_state.reward - self.Q[cur_state.state, cur_state.action]
         )
 
@@ -181,7 +184,7 @@ class DoubleQ(TDMethod):
         device: torch.device = torch.device("cpu"),
     ) -> None:
         self.Q_2: DefaultDict[tuple[int, int], float] = defaultdict(float)
-        
+
         super().__init__(env, load_weights, device)
 
     def _update(self, Q1, Q2, cur_state, next_state):
@@ -195,11 +198,9 @@ class DoubleQ(TDMethod):
             next_q = self.env.gamma * Q2[next_state.state, max_a]
         else:
             next_q = 0
-      
+
         Q1[cur_state.state, cur_state.action] += ALPHA * (
-            cur_state.reward
-            + next_q
-            - Q1[cur_state.state, cur_state.action]
+            cur_state.reward + next_q - Q1[cur_state.state, cur_state.action]
         )
 
     @override

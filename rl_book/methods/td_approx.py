@@ -160,88 +160,8 @@ class SemiGradientSarsaLinear(ApproximateTDMethod[S], Generic[S]):
             self.w = pickle.load(f)
 
 
-class GridWorldCNN(nn.Module):
-    """Simple CNN to process rasterized GridWorld images and output Q values."""
-
-    def __init__(self, num_actions: int) -> None:
-        super().__init__()
-
-        self.conv1 = nn.Conv2d(3, 16, kernel_size=2, padding=0)
-        self.conv2 = nn.Conv2d(16, 32, kernel_size=2, padding=0)
-        self.pool = nn.AdaptiveAvgPool2d(1)
-        self.fc = nn.Linear(32, num_actions)
-
-    def forward(self, x: torch.Tensor):
-        """Forward call.
-
-        Args:
-            x: input tensor [bs, C, H, W]
-
-        Returns:
-            Q values [bs, num_actions]
-        """
-        x = F.relu(self.conv1(x))
-        x = F.relu(self.conv2(x))
-        x = self.pool(x)
-        x = x.view(x.size(0), -1)
-        x = self.fc(x)
-        return x
 
 
-class CNNTicTacToe(nn.Module):
-    """Simple CNN to process rasterized GridWorld images and output Q values."""
-
-    def __init__(self, num_actions: int) -> None:
-        super().__init__()
-
-        self.net = nn.Sequential(
-            nn.Flatten(),
-            nn.Linear(18, 64),
-            nn.ReLU(),
-            nn.Linear(64, 64),
-            nn.ReLU(),
-            nn.Linear(64, num_actions),
-        )
-
-    def forward(self, x: torch.Tensor):
-        """Forward call.
-
-        Args:
-            x: input tensor [bs, C, H, W]
-
-        Returns:
-            Q values [bs, num_actions]
-        """
-        return self.net(x)
-
-
-
-
-class CNNConnectFour(nn.Module):
-    """
-    Lightweight CNN for Connect4 Q-values.
-    Input: [bs, 2, 6, 7] (player-to-move pieces, opponent pieces)
-    Output: [bs, 7] Q-values for columns.
-    """
-
-    def __init__(self, num_actions: int = 7, hidden: int = 64, pooled: int = 2) -> None:
-        super().__init__()
-
-        self.conv1 = nn.Conv2d(2, hidden, kernel_size=3, padding=1)
-        self.conv2 = nn.Conv2d(hidden, hidden, kernel_size=3, padding=1)
-        self.conv3 = nn.Conv2d(hidden, hidden, kernel_size=3, padding=1)
-
-        # Keep coarse spatial layout (2x2 works well for 6x7)
-        self.pool = nn.AdaptiveAvgPool2d((pooled, pooled))
-        self.fc = nn.Linear(hidden * pooled * pooled, num_actions)
-
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
-        x = F.relu(self.conv1(x))
-        x = F.relu(self.conv2(x))
-        x = F.relu(self.conv3(x))
-        x = self.pool(x)
-        x = x.flatten(start_dim=1)
-        return self.fc(x)
 
 class SemiGradientSarsaCNN(ApproximateTDMethod[S], Generic[S]):
     obs_mode: ClassVar[ObsMode] = ObsMode.RASTERIZED
@@ -294,7 +214,6 @@ class SemiGradientSarsaCNN(ApproximateTDMethod[S], Generic[S]):
         mask[:, allowed_actions] = 1.0
         q_masked = q_values.masked_fill(~mask, float("-inf"))
         return q_masked
-
 
     @override
     def update(self, episode: list[ReplayItem[S]], step: int) -> None:
@@ -392,7 +311,7 @@ class SemiGradientSarsaNCNN(ApproximateTDMethod[S], Generic[S]):
             q_values = self.model(state.unsqueeze(0))
         else:
             raise ValueError(f"Got unexpected type {type(state)}")
-        
+
         mask = torch.zeros_like(q_values).bool()
         mask[:, allowed_actions] = 1.0
         q_masked = q_values.masked_fill(~mask, float("-inf"))
@@ -456,5 +375,7 @@ class SemiGradientSarsaNCNN(ApproximateTDMethod[S], Generic[S]):
         return self.model.state_dict()
 
     def _load_weights(self, save_path: str) -> None:
-        state_dict = torch.load(save_path, map_location=self.device)
-        self.model.load_state_dict(state_dict)
+        with open(save_path, "rb") as f:
+            state_dict = pickle.load(f)
+            self.model.load_state_dict(state_dict)
+

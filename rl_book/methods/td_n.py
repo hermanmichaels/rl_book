@@ -27,9 +27,7 @@ class SarsaN(TDMethod):
     def get_name(self) -> str:
         return "SarsaN"
 
-    def _update(
-        self, episode: list[ReplayItem[int]], tau: int | None = None
-    ) -> None:
+    def _update(self, episode: list[ReplayItem[int]], tau: int | None = None) -> None:
         if tau is None:
             # tau is set when finalizing the episode - otherwise pick
             # the correct update step here.
@@ -53,23 +51,21 @@ class SarsaN(TDMethod):
                     ]
                 )
 
-            self.Q[episode[tau].state, episode[tau].action] += ALPHA * (G - self.Q[episode[tau].state, episode[tau].action])
+            self.Q[episode[tau].state, episode[tau].action] += ALPHA * (
+                G - self.Q[episode[tau].state, episode[tau].action]
+            )
 
     @override
-    def update(
-        self, episode: list[ReplayItem[int]], step: int
-    ) -> None:
+    def update(self, episode: list[ReplayItem[int]], step: int) -> None:
         self._update(episode, None)
 
     @override
     def finalize(self, episode: list[ReplayItem[int]], step: int) -> None:
         # Replay has terminated - still finish updating the values
         # by going over the remaining episode.
-        
+
         for tau in range(len(episode) - self.n, len(episode)):
             self._update(episode, tau)
-
-   
 
 
 class TreeN(TDMethod):
@@ -88,16 +84,12 @@ class TreeN(TDMethod):
     def get_name(self) -> str:
         return "TreeN"
 
-    def _update(
-        self, replay_buffer: list[ReplayItem[int]], tau: int | None = None
-    ):
+    def _update(self, replay_buffer: list[ReplayItem[int]], tau: int | None = None):
         if tau is None:
             tau = len(replay_buffer) - self.n - 1
 
         if tau >= 0:
             if tau >= len(replay_buffer) - 1:
-                # assert False
-                print("A")
                 G = replay_buffer[-1].reward
             else:
                 allowed_actions = self.get_allowed_actions(replay_buffer[-1].mask)
@@ -138,7 +130,6 @@ class TreeN(TDMethod):
         self, replay_buffer: list[ReplayItem[int]], step: int, tau: int | None = None
     ):
         self._update(replay_buffer, None)
-        
 
     @override
     def finalize(self, episode: list[ReplayItem[int]], step: int) -> None:
@@ -149,5 +140,3 @@ class TreeN(TDMethod):
         probs = [self.Q[observation, a] for a in range(self.env.get_action_space_len())]
         probs = np.exp(probs - np.max(probs))
         return probs[action] / sum(probs)
-
-

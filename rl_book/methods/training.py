@@ -9,6 +9,7 @@ from rl_book.methods.method import MethodWithStats, RLMethod
 from rl_book.pretty_print import log_methods
 from rl_book.replay_utils import ReplayItem
 
+
 def train_single_player(
     env: ParametrizedEnv,
     method: RLMethod,
@@ -54,19 +55,15 @@ def train_single_player(
 
         if callback and callback(method, step):
             return True, step
-        
-        # if len(episode) == 6:
-        #     import ipdb
-        #     ipdb.set_trace()
-
-        # print("#########################################################")
 
     env.env.close()
 
     return False, step
 
+
 def save_obs(obs, filename="connect4_obs.png"):
     import matplotlib.pyplot as plt
+
     """
     obs: torch.Tensor or np.ndarray, shape [C, H, W]
          channel 0 = current player
@@ -80,7 +77,7 @@ def save_obs(obs, filename="connect4_obs.png"):
     # -1  = opponent
     # import ipdb
     # ipdb.set_trace()
-    board = obs[0] - obs[1]   # shape [H, W]
+    board = obs[0] - obs[1]  # shape [H, W]
 
     plt.figure(figsize=(3, 3))
     plt.imshow(board, cmap="coolwarm", vmin=-1, vmax=1)
@@ -92,6 +89,7 @@ def save_obs(obs, filename="connect4_obs.png"):
     plt.tight_layout()
     plt.savefig(filename)
     plt.close()
+
 
 def train_multi_player(
     env: MultiPlayerEnv,
@@ -188,25 +186,9 @@ def train_multi_player(
             ):
                 s, a, mask = state_dict[env.players[player_pos]]
 
-
-                observation_new = env.env.observe(  # type: ignore
-                    env.players[player_pos]
-                )
-
                 episode.append(ReplayItem(s, a, float(reward), mask))
 
                 methods[method_idx].method.update(episode, step)
-
-        # episode.append(
-        #     ReplayItem(
-        #         env.obs_to_state(
-        #             observation_new["observation"], player_pos
-        #         ),  # type: ignore
-        #         -1,
-        #         0,
-        #         [],
-        #     )
-        # )
 
         methods[method_idx].method.finalize(episode, step)
 
@@ -257,5 +239,6 @@ def train_multi_player(
             zoo = zoo[:zoo_size]
 
         env.env.close()
+
 
 # TODO: wrong action mask in td?
