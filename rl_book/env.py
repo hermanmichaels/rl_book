@@ -4,7 +4,7 @@ from typing import Any
 import gymnasium as gym
 import numpy as np
 import torch
-from gymnasium.core import Env  # TODO: or any other env
+from gymnasium.core import Env
 from gymnasium.spaces import Box, Discrete
 
 
@@ -82,7 +82,7 @@ class GridWorldEnv(ParametrizedEnv):
 
         self.intermediate_rewards = intermediate_rewards
         self.obs_mode = obs_mode
-        self.grid_size = env.unwrapped.desc.shape[0]
+        self.grid_size = env.unwrapped.desc.shape[0]  # type: ignore[attr-defined]
 
     def normalized_grid_position_sum(self, observation: int) -> float:
         """Computes the normalized row / column index of the passed observation.
@@ -93,7 +93,9 @@ class GridWorldEnv(ParametrizedEnv):
             observation // self.grid_size + observation % self.grid_size
         ) / self.grid_size
 
-    def step(self, action: int, old_obs: int) -> tuple[int, float, bool, bool, dict]:
+    def step(
+        self, action: int, old_obs: int | tuple[torch.Tensor, int]
+    ) -> tuple[int, float, bool, bool, dict]:
         """Executes a step in the environment and, among others, returns new observation
         and observed reward.
         When "intermediate_rewards" is set, augment the reward by a progress heuristic,
@@ -115,9 +117,11 @@ class GridWorldEnv(ParametrizedEnv):
 
         if self.intermediate_rewards:
             if self.obs_mode == ObsMode.RASTERIZED:
+                assert isinstance(old_obs, tuple)
                 _, obs_for_intermediate = observation
                 _, old_obs_for_intermediate = old_obs
             else:
+                assert isinstance(old_obs, int)
                 obs_for_intermediate = observation
                 old_obs_for_intermediate = old_obs
 
@@ -141,11 +145,11 @@ class GridWorldEnv(ParametrizedEnv):
 class GridWorldImageWrapper(gym.ObservationWrapper):
     """Wrapper around GridWorldEnv to provide rasterized images as observations."""
 
-    def __init__(self, env: GridWorldEnv, device: torch.device):
+    def __init__(self, env: Env, device: torch.device):
         super().__init__(env)
 
-        self.H = env.unwrapped.desc.shape[0]
-        self.W = env.unwrapped.desc.shape[1]
+        self.H = env.unwrapped.desc.shape[0]  # type: ignore[attr-defined]
+        self.W = env.unwrapped.desc.shape[1]  # type: ignore[attr-defined]
         self.device = device
 
         # Precompute walls and goal
@@ -153,10 +157,11 @@ class GridWorldImageWrapper(gym.ObservationWrapper):
         goal_pos = None
         for r in range(self.H):
             for c in range(self.W):
-                if env.unwrapped.desc[r, c] == b"H":
+                if env.unwrapped.desc[r, c] == b"H":  # type: ignore[attr-defined]
                     walls.add((r, c))
-                elif env.unwrapped.desc[r, c] == b"G":
+                elif env.unwrapped.desc[r, c] == b"G":  # type: ignore[attr-defined]
                     goal_pos = (r, c)
+        assert goal_pos is not None, "No goal found, this should not happen"
 
         self.observation_space = Box(
             low=0.0,
@@ -172,19 +177,6 @@ class GridWorldImageWrapper(gym.ObservationWrapper):
         for (r, c) in walls:
             self.base_obs[2, r, c] = 1.0
 
-    def gridworld_to_image(self, agent_pos, goal_pos, walls, H, W):
-        obs = self.base_obs.clone()
-
-        # Encode agent
-        obs[0, agent_pos[0], agent_pos[1]] = 1.0
-        # Encode goal
-        obs[1, goal_pos[0], goal_pos[1]] = 1.0
-        # Encode walls
-        for (r, c) in walls:
-            obs[2, r, c] = 1.0
-
-        return obs
-
     def observation(self, state: int) -> tuple[torch.Tensor, int]:
         """Computes the rasterized image observation.
 
@@ -198,16 +190,12 @@ class GridWorldImageWrapper(gym.ObservationWrapper):
         # Compute agent position from integer state
         x = state // self.W
         y = state % self.W
-        agent_pos = (x, y)
+
+        obs = self.base_obs.clone()
+        obs[0, x, y] = 1.0
 
         return (
-            self.gridworld_to_image(
-                agent_pos=agent_pos,
-                goal_pos=self.goal_pos,
-                walls=self.walls,
-                H=self.H,
-                W=self.W,
-            ),
+            obs,
             state,
         )
 

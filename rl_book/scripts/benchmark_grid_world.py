@@ -129,7 +129,7 @@ def benchmark(
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     # Iterate over all possible grid sizes.
-    for n in [10, 20, 30]:
+    for n in range(min_grid_size, max_grid_size):
         start = time.time()
         # Iterate over all methods.
         for idx, method_ in enumerate(methods):
@@ -181,13 +181,13 @@ if __name__ == "__main__":
         [Sarsa, SemiGradientSarsaLinear, SemiGradientSarsaCNN],
         fig_path="results/sarsa_approx.png",
     )
-    benchmark(
-        [OnPolicyMC, OffPolicyMC],
-        fig_path="results/mc.png",
-    )
-    benchmark([Sarsa, QLearning, ExpectedSarsa, DoubleQ], fig_path="results/td.png")
-    benchmark([SarsaN, TreeN], fig_path="results/td_n.png")
-    benchmark(
-        [DynaQ],
-        fig_path="results/planning.png",
-    )
+    # benchmark(
+    #     [OnPolicyMC, OffPolicyMC],
+    #     fig_path="results/mc.png",
+    # )
+    # benchmark([Sarsa, QLearning, ExpectedSarsa, DoubleQ], fig_path="results/td.png")
+    # benchmark([SarsaN, TreeN], fig_path="results/td_n.png")
+    # benchmark(
+    #     [DynaQ],
+    #     fig_path="results/planning.png",
+    # )

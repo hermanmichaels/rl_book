@@ -1,6 +1,7 @@
 import copy
 import pickle
 import random
+from abc import ABC
 from collections import defaultdict
 from typing import Any, DefaultDict
 
@@ -13,7 +14,7 @@ from rl_book.replay_utils import ReplayItem
 ALPHA = 0.1
 
 
-class TDMethod(RLMethod):
+class TDMethod(RLMethod, ABC):
     def __init__(self, env: ParametrizedEnv, load_weights: bool = False) -> None:
         super().__init__(env, load_weights)
         self.Q: DefaultDict[tuple[int, int], float] = defaultdict(float)

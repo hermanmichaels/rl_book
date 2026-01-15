@@ -1,6 +1,7 @@
 import gymnasium as gym
+import torch
 
-from rl_book.env import GridWorldEnv
+from rl_book.env import GridWorldEnv, ObsMode
 from rl_book.methods.planning import mcts
 
 GAMMA = 0.9
@@ -20,7 +21,9 @@ def solve_grid_world() -> None:
         map_name="4x4",
         is_slippery=False,
     )
-    env_train = GridWorldEnv(gym_env_train, GAMMA, True, True)
+    env_train = GridWorldEnv(
+        gym_env_train, GAMMA, True, True, ObsMode.DEFAULT, torch.device("cpu")
+    )
 
     gym_env_test = gym.make(
         "FrozenLake-v1",

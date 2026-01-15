@@ -1,5 +1,6 @@
 import copy
 import pickle
+from abc import ABC
 from collections import defaultdict
 from typing import Any, DefaultDict
 
@@ -11,7 +12,7 @@ from rl_book.replay_utils import ReplayItem
 from rl_book.utils import ConstantFactory
 
 
-class MCMethod(RLMethod):
+class MCMethod(RLMethod, ABC):
     def __init__(self, env: ParametrizedEnv, load_weights: bool = False) -> None:
         super().__init__(env, load_weights)
         self.Q: DefaultDict[tuple[int, int], float] = defaultdict(float)
