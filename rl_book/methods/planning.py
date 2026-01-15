@@ -31,7 +31,7 @@ class ReplayBuffer:
 
 
 def model_factory():
-    return 0, 0.0, 0
+    return 0, 0.0, 0, []
 
 
 class DynaQ(RLMethod[int]):
@@ -70,7 +70,7 @@ class DynaQ(RLMethod[int]):
             max_actions = [a for a, q in zip(allowed_actions, q_values) if q == max_q]
             return random.choice(max_actions)
 
-    def update(self, episode: list[ReplayItem[int]], step: int) -> None:
+    def update(self, episode: list[ReplayItem[int]], step: int) -> None: # TODO: signtuare
         if len(episode) <= 1:
             return
 
@@ -85,7 +85,7 @@ class DynaQ(RLMethod[int]):
         next_q = max(
             [self.Q[next_state.state, a_] for a_ in allowed_actions],
             default=0,
-        )
+        ) if step != -1 else 0
 
         self.Q[cur_state.state, cur_state.action] = self.Q[
             cur_state.state, cur_state.action
@@ -95,15 +95,18 @@ class DynaQ(RLMethod[int]):
             - self.Q[cur_state.state, cur_state.action]
         )
 
-        self.model[cur_state.state, cur_state.action] = (
-            next_state.state,
-            cur_state.reward,
-            step,
-            next_state.mask,
-        )
+        if step != -1:
+            self.model[cur_state.state, cur_state.action] = (
+                next_state.state,
+                cur_state.reward,
+                step,
+                next_state.mask,
+            )
 
         for _ in range(self.n):
             observation, action = self.buffer.sample()
+            # import ipdb
+            # ipdb.set_trace()
             observation_new_sampled, reward, t_last, mask = self.model[
                 observation, action
             ]
@@ -129,7 +132,7 @@ class DynaQ(RLMethod[int]):
             self.Q, self.model = pickle.load(f)
 
     def finalize(self, episode: list[ReplayItem[int]], step: int) -> None:
-        self.update(episode, step)
+        self.update(episode, -1)
 
 
 class TreeNode:

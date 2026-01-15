@@ -193,7 +193,7 @@ class CNNTicTacToe(nn.Module):
         self.conv1 = nn.Conv2d(2, 16, kernel_size=2, padding=0)
         self.conv2 = nn.Conv2d(16, 32, kernel_size=2, padding=0)
         self.pool = nn.AdaptiveAvgPool2d(1)
-        self.fc = nn.Linear(16, num_actions)  # 32
+        self.fc = nn.Linear(32, num_actions)  # 32
 
     def forward(self, x: torch.Tensor):
         """Forward call.
@@ -205,40 +205,40 @@ class CNNTicTacToe(nn.Module):
             Q values [bs, num_actions]
         """
         x = F.relu(self.conv1(x))
-        # x = F.relu(self.conv2(x))
+        x = F.relu(self.conv2(x))
         x = self.pool(x)
         x = x.view(x.size(0), -1)
         x = self.fc(x)
         return x
+
+
 
 
 class CNNConnectFour(nn.Module):
-    """Simple CNN to process rasterized GridWorld images and output Q values."""
+    """
+    Lightweight CNN for Connect4 Q-values.
+    Input: [bs, 2, 6, 7] (player-to-move pieces, opponent pieces)
+    Output: [bs, 7] Q-values for columns.
+    """
 
-    def __init__(self, num_actions: int) -> None:
+    def __init__(self, num_actions: int = 7, hidden: int = 64, pooled: int = 2) -> None:
         super().__init__()
 
-        self.conv1 = nn.Conv2d(2, 16, kernel_size=2, padding=0)
-        self.conv2 = nn.Conv2d(16, 32, kernel_size=2, padding=0)
-        self.pool = nn.AdaptiveAvgPool2d(1)
-        self.fc = nn.Linear(16, num_actions)  # 32
+        self.conv1 = nn.Conv2d(2, hidden, kernel_size=3, padding=1)
+        self.conv2 = nn.Conv2d(hidden, hidden, kernel_size=3, padding=1)
+        self.conv3 = nn.Conv2d(hidden, hidden, kernel_size=3, padding=1)
 
-    def forward(self, x: torch.Tensor):
-        """Forward call.
+        # Keep coarse spatial layout (2x2 works well for 6x7)
+        self.pool = nn.AdaptiveAvgPool2d((pooled, pooled))
+        self.fc = nn.Linear(hidden * pooled * pooled, num_actions)
 
-        Args:
-            x: input tensor [bs, C, H, W]
-
-        Returns:
-            Q values [bs, num_actions]
-        """
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
         x = F.relu(self.conv1(x))
-        # x = F.relu(self.conv2(x))
+        x = F.relu(self.conv2(x))
+        x = F.relu(self.conv3(x))
         x = self.pool(x)
-        x = x.view(x.size(0), -1)
-        x = self.fc(x)
-        return x
-
+        x = x.flatten(start_dim=1)
+        return self.fc(x)
 
 class SemiGradientSarsaCNN(ApproximateTDMethod[S], Generic[S]):
     obs_mode: ClassVar[ObsMode] = ObsMode.RASTERIZED
@@ -250,14 +250,32 @@ class SemiGradientSarsaCNN(ApproximateTDMethod[S], Generic[S]):
         device: torch.device = torch.device("cpu"),
         network_class: Type[T] | None = None,
     ) -> None:
+        # print("INIT")
+        self.model = network_class(9).to(device) # TODO
+        
         super().__init__(env, load_weights, device)
+        # print("INIT2")
+
+        # self._avg()
 
         num_actions = self.env.get_action_space_len()
         assert network_class is not None, "network_class must be set"
-        self.model = network_class(num_actions).to(device)
+
         self.optimizer = torch.optim.Adam(self.model.parameters(), lr=ALPHA / 10)
         self.network_class = network_class
         self.all_actions = np.asarray([a for a in range(num_actions)])
+
+    def _avg(self):
+        total_sum = 0.0
+        total_count = 0
+
+        with torch.no_grad():
+            for param in self.model.parameters():
+                total_sum += param.sum().item()
+                total_count += param.numel()
+
+        avg_weight = total_sum / total_count
+        print("Average model weight:", avg_weight)
 
     def clone(self) -> "SemiGradientSarsaCNN":
         cloned = self.__class__(
@@ -327,8 +345,12 @@ class SemiGradientSarsaCNN(ApproximateTDMethod[S], Generic[S]):
         return self.model.state_dict()
 
     def _load_weights(self, save_path: str) -> None:
-        state_dict = torch.load(save_path, map_location=self.device)
-        self.model.load_state_dict(state_dict)
+        # import ipdb
+        # ipdb.set_trace()
+        with open(save_path, "rb") as f:
+            state_dict = pickle.load(f)
+            print(state_dict)
+            self.model.load_state_dict(state_dict)
 
 
 class SemiGradientSarsaNCNN(ApproximateTDMethod[S], Generic[S]):

@@ -46,40 +46,40 @@ def benchmark_multi_player(
 
     methods = [
         MethodWithStats(Random(env)),
-        MethodWithStats(OnPolicyMC(env, load_weights=load_weights)),
-        MethodWithStats(OffPolicyMC(env, load_weights=load_weights)),
-        MethodWithStats(QLearning(env, load_weights=load_weights)),
+        # MethodWithStats(OnPolicyMC(env, load_weights=load_weights)),
+        # MethodWithStats(OffPolicyMC(env, load_weights=load_weights)),
+        # MethodWithStats(QLearning(env, load_weights=load_weights)),
         MethodWithStats(Sarsa(env, load_weights=load_weights)),
-        MethodWithStats(ExpectedSarsa(env, load_weights=load_weights)),
-        MethodWithStats(DoubleQ(env, load_weights=load_weights)),
-        MethodWithStats(SarsaN(env, load_weights=load_weights)),
-        MethodWithStats(TreeN(env, load_weights=load_weights)),
-        MethodWithStats(DynaQ(env, load_weights=load_weights)),
-        MethodWithStats(
-            SemiGradientSarsaCNN(
-                env,
-                load_weights=load_weights,
-                network_class=network_class,
-                device=device,
-            )
-        ),
-        MethodWithStats(
-            SemiGradientSarsaNCNN(
-                env,
-                load_weights=load_weights,
-                network_class=network_class,
-                device=device,
-            )
-        ),
+        # MethodWithStats(ExpectedSarsa(env, load_weights=load_weights)),
+        # MethodWithStats(DoubleQ(env, load_weights=load_weights)),
+        # MethodWithStats(SarsaN(env, load_weights=load_weights)),
+        # MethodWithStats(TreeN(env, load_weights=load_weights)),
+        # MethodWithStats(DynaQ(env, load_weights=load_weights)),
+        # MethodWithStats(
+        #     SemiGradientSarsaCNN(
+        #         env,
+        #         load_weights=load_weights,
+        #         network_class=network_class,
+        #         device=device,
+        #     )
+        # ),
+        # MethodWithStats(
+        #     SemiGradientSarsaNCNN(
+        #         env,
+        #         load_weights=load_weights,
+        #         network_class=network_class,
+        #         device=device,
+        #     )
+        # ),
     ]
     zoo = [MethodWithStats(Random(env))]
     # Train given methods
-    train_multi_player(env, methods, zoo, max_steps=50000, plot_interval=1000)
+    train_multi_player(env, methods, zoo, max_steps=100000, plot_interval=1000)
 
     # Now give user chance to play against one of the methods
     # TOOD: need good wrapper from action to input
     env = get_env(env_name, device, "human")
-    test_against_user(env, methods[-2].method)
+    test_against_user(env, methods[-1].method)
 
 
 if __name__ == "__main__":

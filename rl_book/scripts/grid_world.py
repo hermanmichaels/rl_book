@@ -1,4 +1,5 @@
 import argparse
+from functools import partial
 
 import gymnasium as gym
 import torch

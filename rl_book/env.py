@@ -320,7 +320,7 @@ class TicTacToeEnv(MultiPlayerEnv[int | torch.Tensor]):
                     else:
                         state_flat.append(0)  # empty
 
-            state_flat.append(start_pos)
+            # state_flat.append(start_pos)
 
             # Convert base-3 list to integer
             state = 0
@@ -329,6 +329,8 @@ class TicTacToeEnv(MultiPlayerEnv[int | torch.Tensor]):
 
             return state
         elif obs_mode == ObsMode.RASTERIZED:
+            # import ipdb
+            # ipdb.set_trace()
             return torch.as_tensor(
                 np.transpose(obs, [2, 1, 0]), device=self.device
             ).float()
@@ -354,18 +356,48 @@ class TicTacToeEnv(MultiPlayerEnv[int | torch.Tensor]):
         _________\n\
         2 | 5 | 8"
 
+def save_connect4_obs(obs, filename="connect4_obs.png"):
+    import matplotlib.pyplot as plt
+    """
+    obs: torch.Tensor or np.ndarray, shape [C, H, W]
+         channel 0 = current player
+         channel 1 = opponent
+    """
+    if hasattr(obs, "detach"):
+        obs = obs.detach().cpu().numpy()
+
+    # Convert to board with values:
+    #  1  = current player
+    # -1  = opponent
+    # import ipdb
+    # ipdb.set_trace()
+    board = obs[..., 0] - obs[..., 1]   # shape [H, W]
+
+    plt.figure(figsize=(7, 6))
+    plt.imshow(board, cmap="coolwarm", vmin=-1, vmax=1)
+    # plt.colorbar(label="Player")
+    plt.title("Connect4 Observation")
+    # plt.xlabel("Column")
+    # plt.ylabel("Row")
+    plt.gca().invert_yaxis()  # bottom row at bottom
+    plt.tight_layout()
+    plt.savefig(filename)
+    plt.close()
 
 class ConnectFourEnv(MultiPlayerEnv[int | torch.Tensor]):
     """ConnectFour env."""
 
     def __init__(self, env: Env, gamma=0.95, device=torch.device("cpu")) -> None:
         super().__init__(env, gamma, ["player_0", "player_1"], device)
+        self.c = 0
 
     def obs_to_state(
         self, obs: Any, start_pos: int = 0, obs_mode: ObsMode = ObsMode.DEFAULT
     ) -> int | torch.Tensor:
+
         if obs_mode == ObsMode.DEFAULT:
             board = obs  # shape: (6, 7, 2)
+            # print(obs.transpose(2, 1, 0))
             state_flat = []
 
             for row in range(6):
@@ -377,7 +409,7 @@ class ConnectFourEnv(MultiPlayerEnv[int | torch.Tensor]):
                     else:
                         state_flat.append(0)  # empty
 
-            state_flat.append(start_pos)
+            state_flat.append(start_pos) # TODO: remove!
 
             # Convert to base-3 integer
             state_encoded = 0
@@ -386,9 +418,17 @@ class ConnectFourEnv(MultiPlayerEnv[int | torch.Tensor]):
 
             return state_encoded
         elif obs_mode == ObsMode.RASTERIZED:
-            return torch.as_tensor(
+            # print("###")
+            # save_connect4_obs(obs, f"plots/{self.c}.png")
+            self.c += 1
+            res = torch.as_tensor(
                 np.transpose(obs, [2, 1, 0]), device=self.device
             ).float()
+            # import ipdb
+            # ipdb.set_trace()
+            # if start_pos == 1:
+            #     res = torch.flip(res, [0])
+            return res
         raise ValueError(f"Got unexpected obs_mode {obs_mode}")
 
     def get_game_result(self, reward: float) -> GameResult:

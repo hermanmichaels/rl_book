@@ -9,7 +9,6 @@ from rl_book.methods.method import MethodWithStats, RLMethod
 from rl_book.pretty_print import log_methods
 from rl_book.replay_utils import ReplayItem
 
-
 def train_single_player(
     env: ParametrizedEnv,
     method: RLMethod,
@@ -51,7 +50,6 @@ def train_single_player(
             if cur_episode_len > env.get_max_num_steps():
                 break
 
-        episode.append(ReplayItem(observation_new, -1, reward, []))
         method.finalize(episode, step)
 
         if callback and callback(method, step):
@@ -61,6 +59,33 @@ def train_single_player(
 
     return False, step
 
+def save_obs(obs, filename="connect4_obs.png"):
+    import matplotlib.pyplot as plt
+    """
+    obs: torch.Tensor or np.ndarray, shape [C, H, W]
+         channel 0 = current player
+         channel 1 = opponent
+    """
+    if hasattr(obs, "detach"):
+        obs = obs.detach().cpu().numpy()
+
+    # Convert to board with values:
+    #  1  = current player
+    # -1  = opponent
+    # import ipdb
+    # ipdb.set_trace()
+    board = obs[0] - obs[1]   # shape [H, W]
+
+    plt.figure(figsize=(3, 3))
+    plt.imshow(board, cmap="coolwarm", vmin=-1, vmax=1)
+    # plt.colorbar(label="Player")
+    plt.title("Connect4 Observation")
+    # plt.xlabel("Column")
+    # plt.ylabel("Row")
+    plt.gca().invert_yaxis()  # bottom row at bottom
+    plt.tight_layout()
+    plt.savefig(filename)
+    plt.close()
 
 def train_multi_player(
     env: MultiPlayerEnv,
@@ -80,7 +105,7 @@ def train_multi_player(
         max_steps: maixmal number of update steps
     """
     # For plotting: keep (step, win_ratio) tuples for every method at different steps.
-    win_ratios: list[list[tuple[int, float]]] = [[] for method in methods]
+    win_ratios: list[list[tuple[int, float]]] = [[] for _ in methods]
 
     for step in range(max_steps):
         env.env.reset()
@@ -100,6 +125,8 @@ def train_multi_player(
         done = False
         episode = []
 
+        c = 0
+
         while not done:
             agent = env.env.agent_selection  # type: ignore
             (
@@ -109,6 +136,12 @@ def train_multi_player(
                 truncation,
                 _,
             ) = env.env.last()  # type: ignore
+
+            # print("-------")
+            # print(observation["observation"])
+
+            # save_obs(observation["observation"], f"plots/{c}.png")
+            c += 1
 
             done = termination or truncation
 
@@ -143,35 +176,38 @@ def train_multi_player(
             env.env.step(action)
 
             _, reward, _, _, _ = env.env.last()  # type: ignore
-
             if (
                 env.env.agent_selection == env.players[player_pos]  # type: ignore
                 and env.env.agent_selection in state_dict  # type: ignore
             ):
                 s, a, mask = state_dict[env.players[player_pos]]
 
-                observation_new = env.env.observe(  # type: ignore
-                    env.players[player_pos]
-                )
-
                 episode.append(ReplayItem(s, a, float(reward), mask))
 
                 methods[method_idx].method.update(episode, step)
 
-        episode.append(
-            ReplayItem(
-                env.obs_to_state(
-                    observation_new["observation"],
-                    player_pos,
-                    obs_mode=methods[method_idx].method.obs_mode,
-                ),  # type: ignore
-                -1,
-                0,
-                [],
-            )
-        )
-
         methods[method_idx].method.finalize(episode, step)
+
+        # print("END")
+
+        # import os
+
+        # folder_path = "plots"
+
+        # for filename in os.listdir(folder_path):
+        #     file_path = os.path.join(folder_path, filename)
+        #     if os.path.isfile(file_path):
+        #         os.remove(file_path)
+
+        # print(player_pos)
+        # print(print([state.reward for state in episode]))
+        # for c, state in enumerate(episode):
+        #     save_obs(state.state, f"plots/{c}.png")
+
+        # import ipdb
+        # ipdb.set_trace()
+
+        # assert False
 
         if plot_interval and step % plot_interval == 0 and step > 0:
             for idx, method in enumerate(methods):
@@ -199,3 +235,5 @@ def train_multi_player(
             zoo = zoo[:zoo_size]
 
         env.env.close()
+
+# TODO: wrong action mask in td?

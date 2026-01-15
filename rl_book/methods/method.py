@@ -54,7 +54,7 @@ class RLMethod(Generic[S], ABC):
         """
         raise NotImplementedError
 
-    def update(self, episode: list[ReplayItem[S]], step: int) -> None:
+    def update(self, episode: list[ReplayItem[S]], is_final: int) -> None:
         """Updates the method's parameters.
 
         Args:
@@ -63,6 +63,7 @@ class RLMethod(Generic[S], ABC):
         """
         pass
 
+        # TODO: step?
     def finalize(self, episode: list[ReplayItem[S]], step: int) -> None:
         """Called when one episode generation has finished.
 

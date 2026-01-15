@@ -32,7 +32,7 @@ class SarsaN(TDMethod):
             self.update(episode, step, tau)
 
     def update(
-        self, episode: list[ReplayItem[int]], step: int, tau: int | None = None
+        self, episode: list[ReplayItem[int]], step: int, tau: int | None = None # TODO signautre?
     ) -> None:
         is_final = True
         if tau is None:
@@ -42,10 +42,11 @@ class SarsaN(TDMethod):
             is_final = False
 
         if tau >= 0:
+            end_index = len(episode)
             G = sum(
                 [
                     episode[i].reward * self.env.gamma ** (i - tau)
-                    for i in range(tau, min(tau + self.n, len(episode)))
+                    for i in range(tau, min(tau + self.n, end_index))
                 ]
             )
 
