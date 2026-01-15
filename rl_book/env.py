@@ -1,10 +1,11 @@
 from enum import Enum
-from typing import Any
+from typing import Any, Generic, Literal, TypeVar, overload
 
 import gymnasium as gym
 import numpy as np
 import torch
 from gymnasium.core import Env
+from gymnasium.envs.toy_text.frozen_lake import generate_random_map
 from gymnasium.spaces import Box, Discrete
 
 
@@ -16,7 +17,71 @@ class ObsMode(Enum):
     RASTERIZED = 2
 
 
-class ParametrizedEnv:
+S = TypeVar("S")
+
+GAMMA = 0.97
+
+
+@overload
+def generate_random_grid_world_env(
+    n: int,
+    extra_rewards: bool,
+    eps_decay: bool,
+    obs_mode: Literal[ObsMode.DEFAULT],
+    device: torch.device = torch.device("cpu"),
+) -> tuple["GridWorldEnv[int]", list[str]]:
+    ...
+
+
+@overload
+def generate_random_grid_world_env(
+    n: int,
+    extra_rewards: bool,
+    eps_decay: bool,
+    obs_mode: Literal[ObsMode.RASTERIZED],
+    device: torch.device = torch.device("cpu"),
+) -> tuple["GridWorldEnv[tuple[torch.Tensor, int]]", list[str]]:
+    ...
+
+
+@overload
+def generate_random_grid_world_env(
+    n: int,
+    extra_rewards: bool,
+    eps_decay: bool,
+    obs_mode: ObsMode,
+    device: torch.device = torch.device("cpu"),
+) -> tuple["GridWorldEnv[int | tuple[torch.Tensor, int]]", list[str]]:
+    ...
+
+
+def generate_random_grid_world_env(
+    n: int,
+    extra_rewards: bool,
+    eps_decay: bool,
+    obs_mode: ObsMode,
+    device: torch.device = torch.device("cpu"),
+) -> tuple["GridWorldEnv", list[str]]:
+    desc = generate_random_map(size=n)
+    gym_env = gym.make(
+        "FrozenLake-v1",
+        desc=desc,
+        is_slippery=False,
+    )
+    return (
+        GridWorldEnv(
+            gym_env,
+            GAMMA,
+            intermediate_rewards=extra_rewards,
+            eps_decay=eps_decay,
+            obs_mode=obs_mode,
+            device=device,
+        ),
+        desc,
+    )
+
+
+class ParametrizedEnv(Generic[S]):
     """Custom wrapper around Gymnasium (or other) envs."""
 
     def __init__(self, env: Env, gamma: float, eps_decay: bool) -> None:
@@ -47,10 +112,7 @@ class ParametrizedEnv:
             )
         )
 
-    def obs_to_state(self, obs: Any, start_pos: int = 0) -> int:
-        return obs
-
-    def step(self, action: int, old_obs: int) -> tuple[int, float, bool, bool, dict]:
+    def step(self, action: int, old_obs: S) -> tuple[S, float, bool, bool, dict]:
         raise NotImplementedError
 
     def get_action_space_len(self) -> int:
@@ -63,7 +125,7 @@ class ParametrizedEnv:
         raise NotImplementedError
 
 
-class GridWorldEnv(ParametrizedEnv):
+class GridWorldEnv(ParametrizedEnv[S], Generic[S]):
     """Env wrapper for "Grid world"."""
 
     def __init__(
@@ -93,9 +155,7 @@ class GridWorldEnv(ParametrizedEnv):
             observation // self.grid_size + observation % self.grid_size
         ) / self.grid_size
 
-    def step(
-        self, action: int, old_obs: int | tuple[torch.Tensor, int]
-    ) -> tuple[int | tuple[torch.Tensor, int], float, bool, bool, dict]:
+    def step(self, action: int, old_obs: S) -> tuple[S, float, bool, bool, dict]:
         """Executes a step in the environment and, among others, returns new observation
         and observed reward.
         When "intermediate_rewards" is set, augment the reward by a progress heuristic,
@@ -207,7 +267,7 @@ class GameResult(Enum):
     LOSS = 3
 
 
-class MultiPlayerEnv(ParametrizedEnv):
+class MultiPlayerEnv(ParametrizedEnv[S], Generic[S]):
     """Wrapper around multi-player game envs.
     Atm only 2-player games are supported."""
 
@@ -228,7 +288,7 @@ class MultiPlayerEnv(ParametrizedEnv):
 
     def obs_to_state(
         self, obs: Any, player_pos: int = 0, obs_mode: ObsMode = ObsMode.DEFAULT
-    ) -> int | torch.Tensor:
+    ) -> S:
         raise NotImplementedError
 
     def get_game_result(self, reward) -> GameResult:
@@ -239,7 +299,7 @@ class MultiPlayerEnv(ParametrizedEnv):
         raise NotImplementedError
 
 
-class TicTacToeEnv(MultiPlayerEnv):
+class TicTacToeEnv(MultiPlayerEnv[int | torch.Tensor]):
     """TicTacToe env."""
 
     def __init__(self, env: Env, gamma=0.95, device=torch.device("cpu")):
@@ -273,6 +333,8 @@ class TicTacToeEnv(MultiPlayerEnv):
             return torch.as_tensor(
                 np.transpose(obs, [2, 1, 0]), device=self.device
             ).float()
+        else:
+            raise ValueError(f"Got unexpected obs_mode {obs_mode}")
 
     def get_game_result(self, reward: float) -> GameResult:
         if reward == 1:
@@ -294,7 +356,7 @@ class TicTacToeEnv(MultiPlayerEnv):
         2 | 5 | 8"
 
 
-class ConnectFourEnv(MultiPlayerEnv):
+class ConnectFourEnv(MultiPlayerEnv[int | torch.Tensor]):
     """ConnectFour env."""
 
     def __init__(self, env: Env, gamma=0.95, device=torch.device("cpu")) -> None:
@@ -302,7 +364,7 @@ class ConnectFourEnv(MultiPlayerEnv):
 
     def obs_to_state(
         self, obs: Any, start_pos: int = 0, obs_mode: ObsMode = ObsMode.DEFAULT
-    ) -> int:
+    ) -> int | torch.Tensor:
         if obs_mode == ObsMode.DEFAULT:
             board = obs  # shape: (6, 7, 2)
             state_flat = []
@@ -325,12 +387,10 @@ class ConnectFourEnv(MultiPlayerEnv):
 
             return state_encoded
         elif obs_mode == ObsMode.RASTERIZED:
-            return (
-                torch.as_tensor(
-                    np.transpose(obs, [2, 1, 0]), device=self.device
-                ).float(),
-                0,
-            )  # 0 # TODO: to satisfy
+            return torch.as_tensor(
+                np.transpose(obs, [2, 1, 0]), device=self.device
+            ).float()
+        raise ValueError(f"Got unexpected obs_mode {obs_mode}")
 
     def get_game_result(self, reward: float) -> GameResult:
         if reward == 1:

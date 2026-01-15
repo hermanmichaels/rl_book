@@ -1,14 +1,11 @@
 import time
 from functools import partial
-from typing import Callable
 
-import gymnasium as gym
 import matplotlib.pyplot as plt
 import torch
 from gymnasium.core import Env
-from gymnasium.envs.toy_text.frozen_lake import generate_random_map
 
-from rl_book.env import GridWorldEnv, ObsMode
+from rl_book.env import generate_random_grid_world_env
 from rl_book.methods.mc import OffPolicyMC, OnPolicyMC
 from rl_book.methods.method import RLMethod
 from rl_book.methods.planning import DynaQ
@@ -19,29 +16,9 @@ from rl_book.methods.td_approx import (SemiGradientSarsaCNN,
 from rl_book.methods.td_n import SarsaN, TreeN
 from rl_book.methods.training import train_single_player
 
-GAMMA = 0.97
 MAX_INFERENCE_STEPS = 1000
 MAX_STEPS = [10000, 30000, 100000, 200000]
 TRIES_PER_STEP = 3
-
-
-def generate_random_env(
-    n: int, extra_rewards: bool, eps_decay: bool, obs_mode: ObsMode, device=torch.device
-) -> GridWorldEnv:
-    desc = generate_random_map(size=n)
-    gym_env = gym.make(
-        "FrozenLake-v1",
-        desc=desc,
-        is_slippery=False,
-    )
-    return GridWorldEnv(
-        gym_env,
-        GAMMA,
-        intermediate_rewards=extra_rewards,
-        eps_decay=eps_decay,
-        obs_mode=obs_mode,
-        device=device,
-    )
 
 
 def get_check_frequency(step: int) -> int:
@@ -86,7 +63,7 @@ def success_callback(method: RLMethod, step: int, env: Env) -> bool:
 
 def plot_results(
     needed_steps: list[list[int]],
-    methods: list[Callable],
+    methods: list[type[RLMethod]],
     min_grid_size: int,
     max_grid_size: int,
     fig_path: str,
@@ -143,7 +120,7 @@ def benchmark(
             for max_steps in MAX_STEPS:
                 steps_needed_cur: list[int] = []
                 for _ in range(TRIES_PER_STEP):
-                    env = generate_random_env(
+                    env, _ = generate_random_grid_world_env(
                         n, extra_rewards, eps_decay, method_.obs_mode, device
                     )
                     method = method_(env, device=device)

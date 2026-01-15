@@ -16,7 +16,7 @@ from rl_book.replay_utils import ReplayItem
 ALPHA = 0.1
 
 S = TypeVar("S")
-T = TypeVar("T")
+T = TypeVar("T", bound=nn.Module)
 
 
 class ApproximateTDMethod(RLMethod[S], Generic[S], ABC):
@@ -50,10 +50,6 @@ class ApproximateTDMethod(RLMethod[S], Generic[S], ABC):
             probs /= probs.sum()
             chosen_idx: int = int(torch.multinomial(probs, 1).item())
             all_actions = self.get_allowed_actions([])
-            if chosen_idx not in allowed_actions:
-                import ipdb
-
-                ipdb.set_trace()
             return all_actions[chosen_idx]
 
     def _get_save_data(self) -> Any:
@@ -63,9 +59,7 @@ class ApproximateTDMethod(RLMethod[S], Generic[S], ABC):
         pass
 
     @abstractmethod
-    def q(
-        self, state: int | tuple[torch.Tensor, int], allowed_actions: np.ndarray
-    ) -> torch.Tensor:
+    def q(self, state: S, allowed_actions: np.ndarray) -> torch.Tensor:
         """Computes q function.
 
         Args:
@@ -253,18 +247,24 @@ class SemiGradientSarsaCNN(ApproximateTDMethod[S], Generic[S]):
         self,
         env: ParametrizedEnv,
         load_weights: bool = False,
-        network_class: Type[T] = GridWorldCNN,
         device: torch.device = torch.device("cpu"),
+        network_class: Type[T] | None = None,
     ) -> None:
         super().__init__(env, load_weights, device)
 
         num_actions = self.env.get_action_space_len()
+        assert network_class is not None, "network_class must be set"
         self.model = network_class(num_actions).to(device)
         self.optimizer = torch.optim.Adam(self.model.parameters(), lr=ALPHA / 10)
         self.network_class = network_class
 
     def clone(self) -> "SemiGradientSarsaCNN":
-        cloned = self.__class__(self.env, False, self.network_class, self.device)
+        cloned = self.__class__(
+            self.env,
+            False,
+            self.device,
+            self.network_class,
+        )
         cloned.model.load_state_dict(copy.deepcopy(self.model.state_dict()))
         return cloned
 
@@ -273,7 +273,7 @@ class SemiGradientSarsaCNN(ApproximateTDMethod[S], Generic[S]):
 
     def q(
         self,
-        state: int | tuple[torch.Tensor, int],
+        state: S,
         allowed_actions: np.ndarray,  # todo: wrong
     ) -> torch.Tensor:
         if isinstance(state, tuple):
@@ -287,9 +287,7 @@ class SemiGradientSarsaCNN(ApproximateTDMethod[S], Generic[S]):
         q_masked = q_values.masked_fill(~mask, float("-inf"))
         return q_masked
 
-    def _update(
-        self, episode: list[ReplayItem[int | tuple[torch.Tensor, int]]], is_final: bool
-    ) -> None:
+    def _update(self, episode: list[ReplayItem[S]], is_final: bool) -> None:
         """Executes one update step.
 
         Args:
@@ -323,14 +321,10 @@ class SemiGradientSarsaCNN(ApproximateTDMethod[S], Generic[S]):
         loss.backward()
         self.optimizer.step()
 
-    def update(
-        self, episode: list[ReplayItem[int | tuple[torch.Tensor, int]]], step: int
-    ) -> None:
+    def update(self, episode: list[ReplayItem[S]], step: int) -> None:
         self._update(episode, False)
 
-    def finalize(
-        self, episode: list[ReplayItem[int | tuple[torch.Tensor, int]]], step: int
-    ) -> None:
+    def finalize(self, episode: list[ReplayItem[S]], step: int) -> None:
         self._update(episode, True)
 
     def _get_save_data(self) -> Any:
@@ -348,13 +342,14 @@ class SemiGradientSarsaNCNN(ApproximateTDMethod[S], Generic[S]):
         self,
         env: ParametrizedEnv,
         load_weights: bool = False,
-        network_class: Type[T] = GridWorldCNN,
         device: torch.device = torch.device("cpu"),
+        network_class: Type[T] | None = None,
         n: int = 3,
     ) -> None:
         super().__init__(env, load_weights, device)
 
         self.num_actions = self.env.get_action_space_len()
+        assert network_class is not None, "network_class must be set"
         self.model = network_class(self.num_actions).to(device)
         self.optimizer = torch.optim.Adam(self.model.parameters(), lr=ALPHA / 10)
         self.network_class = network_class
@@ -362,7 +357,7 @@ class SemiGradientSarsaNCNN(ApproximateTDMethod[S], Generic[S]):
 
     def clone(self) -> "SemiGradientSarsaNCNN":
         cloned = self.__class__(
-            self.env, False, self.network_class, self.device, self.n
+            self.env, False, self.device, self.network_class, self.n
         )
         cloned.model.load_state_dict(copy.deepcopy(self.model.state_dict()))
         return cloned

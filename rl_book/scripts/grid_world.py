@@ -2,9 +2,9 @@ import argparse
 
 import gymnasium as gym
 import torch
-from gymnasium.envs.toy_text.frozen_lake import generate_random_map
 
-from rl_book.env import GridWorldEnv, GridWorldImageWrapper, ObsMode
+from rl_book.env import (GridWorldImageWrapper, ObsMode,
+                         generate_random_grid_world_env)
 from rl_book.methods.dp import policy_iteration, value_iteration
 from rl_book.methods.inference import test_single_player
 from rl_book.methods.mc import OffPolicyMC, OnPolicyMC
@@ -28,26 +28,14 @@ def solve_grid_world(method_name: str) -> None:
     Args:
         method: solving method
     """
-    desc = generate_random_map(size=4)
-
-    gym_env_train = gym.make(
-        "FrozenLake-v1",
-        desc=desc,
-        is_slippery=False,
-    )
     obs_mode = (
         ObsMode.RASTERIZED
         if method_name in ["semi_gradient_sarsa_cnn", "semi_gradient_sarsa_n_cnn"]
         else ObsMode.DEFAULT
     )
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    env_train = GridWorldEnv(
-        gym_env_train,
-        GAMMA,
-        intermediate_rewards=True,
-        eps_decay=True,
-        obs_mode=obs_mode,
-        device=device,
+    env_train, desc = generate_random_grid_world_env(
+        n=4, extra_rewards=True, eps_decay=True, obs_mode=obs_mode, device=device
     )
 
     # Find policy

@@ -21,7 +21,7 @@ def solve_grid_world() -> None:
         map_name="4x4",
         is_slippery=False,
     )
-    env_train = GridWorldEnv(
+    env_train = GridWorldEnv[int](
         gym_env_train, GAMMA, True, True, ObsMode.DEFAULT, torch.device("cpu")
     )
 
