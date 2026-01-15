@@ -91,7 +91,7 @@ def plot_results(
     max_grid_size: int,
     fig_path: str,
 ) -> None:
-    x_values = [n for n in range(min_grid_size, max_grid_size)]
+    x_values = [10, 20, 30, 40, 50]  # [n for n in range(min_grid_size, max_grid_size)]
     markers = ["o", "s", "^", "*"]
 
     for idx, y_values in enumerate(needed_steps):
@@ -102,16 +102,18 @@ def plot_results(
             label=methods[idx].__name__,
         )
         plt.legend()
+        plt.xticks([10, 20, 30, 40, 50])
         plt.xlabel("Gridworld size")
         plt.ylabel("Steps needed")
-        plt.savefig(fig_path)
+
+    plt.savefig(fig_path)
     plt.clf()
 
 
 def benchmark(
     methods: list,
-    min_grid_size=4,
-    max_grid_size=6,
+    min_grid_size=5,
+    max_grid_size=26,
     extra_rewards: bool = True,
     eps_decay: bool = True,
     fig_path: str = "result.png",
@@ -131,7 +133,7 @@ def benchmark(
     rasterized_models = ["SemiGradientSarsaCNN", "SemiGradientSarsaNCNN"]
 
     # Iterate over all possible grid sizes.
-    for n in range(min_grid_size, max_grid_size):
+    for n in [50]:
         start = time.time()
         # Iterate over all methods.
         for idx, method_ in enumerate(methods):
@@ -189,7 +191,15 @@ if __name__ == "__main__":
     #     [DynaQ],
     #     fig_path="results/planning.png",
     # )
+    # benchmark(
+    #     [SemiGradientSarsaLinear, SemiGradientSarsaCNN, SemiGradientSarsaNCNN],
+    #     fig_path="results/td_approx.png",
+    # )
+    # benchmark(
+    #     [OnPolicyMC, Sarsa, QLearning, SarsaN, TreeN, DynaQ],
+    #     fig_path="results/td_approx.png",
+    # )
     benchmark(
-        [SemiGradientSarsaLinear, SemiGradientSarsaCNN, SemiGradientSarsaNCNN],
-        fig_path="results/td_approx.png",
+        [SemiGradientSarsaCNN],
+        fig_path="results/sarsa_approx.png",
     )

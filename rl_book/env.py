@@ -81,8 +81,8 @@ class GridWorldEnv(ParametrizedEnv):
             super().__init__(env, gamma, eps_decay)
 
         self.intermediate_rewards = intermediate_rewards
-        self.obs_mode = obs_mode
         self.grid_size = env.unwrapped.desc.shape[0]  # type: ignore[attr-defined]
+        self.obs_mode = obs_mode
 
     def normalized_grid_position_sum(self, observation: int) -> float:
         """Computes the normalized row / column index of the passed observation.
@@ -211,11 +211,14 @@ class MultiPlayerEnv(ParametrizedEnv):
     """Wrapper around multi-player game envs.
     Atm only 2-player games are supported."""
 
-    def __init__(self, env: Env, gamma: float, players: list[str]) -> None:
+    def __init__(
+        self, env: Env, gamma: float, players: list[str], device=torch.device("cpu")
+    ) -> None:
         super().__init__(env, gamma, True)
         if not len(players) == 2:
             raise ValueError(f"Expected two players, but got {players}")
         self.players = players
+        self.device = device
 
     def get_action_space_len(self) -> int:
         return self.env.action_space(self.players[0]).n  # type: ignore
@@ -223,7 +226,9 @@ class MultiPlayerEnv(ParametrizedEnv):
     def get_observation_space_len(self) -> int:
         raise NotImplementedError
 
-    def obs_to_state(self, obs: Any, player_pos: int = 0) -> int:
+    def obs_to_state(
+        self, obs: Any, player_pos: int = 0, obs_mode: ObsMode = ObsMode.DEFAULT
+    ) -> int:
         raise NotImplementedError
 
     def get_game_result(self, reward) -> GameResult:
@@ -237,29 +242,40 @@ class MultiPlayerEnv(ParametrizedEnv):
 class TicTacToeEnv(MultiPlayerEnv):
     """TicTacToe env."""
 
-    def __init__(self, env: Env, gamma=0.95):
-        super().__init__(env, gamma, ["player_1", "player_2"])
+    def __init__(self, env: Env, gamma=0.95, device=torch.device("cpu")):
+        super().__init__(env, gamma, ["player_1", "player_2"], device)
 
-    def obs_to_state(self, obs: Any, start_pos: int = 0) -> int:
-        board = obs  # shape: (3, 3, 2)
-        state_flat = []
+    def obs_to_state(
+        self, obs: Any, start_pos: int = 0, obs_mode: ObsMode = ObsMode.DEFAULT
+    ) -> int:
+        if obs_mode == ObsMode.DEFAULT:
+            board = obs  # shape: (3, 3, 2)
+            state_flat = []
 
-        for row in range(3):
-            for col in range(3):
-                if board[row][col][0] == 1:
-                    state_flat.append(1)  # player 1
-                elif board[row][col][1] == 1:
-                    state_flat.append(2)  # player 2
-                else:
-                    state_flat.append(0)  # empty
+            for row in range(3):
+                for col in range(3):
+                    if board[row][col][0] == 1:
+                        state_flat.append(1)  # player 1
+                    elif board[row][col][1] == 1:
+                        state_flat.append(2)  # player 2
+                    else:
+                        state_flat.append(0)  # empty
 
-        state_flat.append(start_pos)
+            state_flat.append(start_pos)
 
-        # Convert base-3 list to integer
-        state = 0
-        for i, val in enumerate(state_flat):
-            state += val * (3**i)
-        return state
+            # Convert base-3 list to integer
+            state = 0
+            for i, val in enumerate(state_flat):
+                state += val * (3**i)
+
+            return state
+        elif obs_mode == ObsMode.RASTERIZED:
+            return (
+                torch.as_tensor(
+                    np.transpose(obs, [2, 1, 0]), device=self.device
+                ).float(),
+                0,
+            )  # 0 # TODO: to satisfy
 
     def get_game_result(self, reward: float) -> GameResult:
         if reward == 1:
@@ -284,30 +300,40 @@ class TicTacToeEnv(MultiPlayerEnv):
 class ConnectFourEnv(MultiPlayerEnv):
     """ConnectFour env."""
 
-    def __init__(self, env: Env, gamma=0.95) -> None:
-        super().__init__(env, gamma, ["player_0", "player_1"])
+    def __init__(self, env: Env, gamma=0.95, device=torch.device("cpu")) -> None:
+        super().__init__(env, gamma, ["player_0", "player_1"], device)
 
-    def obs_to_state(self, obs: Any, start_pos: int = 0) -> int:
-        board = obs  # shape: (6, 7, 2)
-        state_flat = []
+    def obs_to_state(
+        self, obs: Any, start_pos: int = 0, obs_mode: ObsMode = ObsMode.DEFAULT
+    ) -> int:
+        if obs_mode == ObsMode.DEFAULT:
+            board = obs  # shape: (6, 7, 2)
+            state_flat = []
 
-        for row in range(6):
-            for col in range(7):
-                if board[row][col][0] == 1:
-                    state_flat.append(1)  # player 1
-                elif board[row][col][1] == 1:
-                    state_flat.append(2)  # player 2
-                else:
-                    state_flat.append(0)  # empty
+            for row in range(6):
+                for col in range(7):
+                    if board[row][col][0] == 1:
+                        state_flat.append(1)  # player 1
+                    elif board[row][col][1] == 1:
+                        state_flat.append(2)  # player 2
+                    else:
+                        state_flat.append(0)  # empty
 
-        state_flat.append(start_pos)
+            state_flat.append(start_pos)
 
-        # Convert to base-3 integer
-        state_encoded = 0
-        for i, val in enumerate(state_flat):
-            state_encoded += val * (3**i)
+            # Convert to base-3 integer
+            state_encoded = 0
+            for i, val in enumerate(state_flat):
+                state_encoded += val * (3**i)
 
-        return state_encoded
+            return state_encoded
+        elif obs_mode == ObsMode.RASTERIZED:
+            return (
+                torch.as_tensor(
+                    np.transpose(obs, [2, 1, 0]), device=self.device
+                ).float(),
+                0,
+            )  # 0 # TODO: to satisfy
 
     def get_game_result(self, reward: float) -> GameResult:
         if reward == 1:

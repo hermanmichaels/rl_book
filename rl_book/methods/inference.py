@@ -1,6 +1,6 @@
 from gymnasium.core import Env
 
-from rl_book.env import MultiPlayerEnv
+from rl_book.env import MultiPlayerEnv, ObsMode
 from rl_book.methods.method import RLMethod
 
 NUM_STEPS = 1000
@@ -36,7 +36,9 @@ def test_against_user(env: MultiPlayerEnv, method: RLMethod) -> None:
         else:
             mask = observation["action_mask"]
 
-            state = env.obs_to_state(observation["observation"], 0)
+            state = env.obs_to_state(
+                observation["observation"], 0, ObsMode.RASTERIZED
+            )  # TODO
             if agent == "player_1":
                 action = method.act(state, mask=mask)
             else:
