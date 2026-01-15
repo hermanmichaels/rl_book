@@ -76,11 +76,15 @@ def solve_grid_world(method_name: str) -> None:
         elif method_name == "dyna_q":
             method = DynaQ(env_train)
         elif method_name == "semi_gradient_sarsa_linear":
-            method = SemiGradientSarsaLinear(env_train)
+            method = SemiGradientSarsaLinear[tuple[torch.Tensor, int]](env_train)
         elif method_name == "semi_gradient_sarsa_cnn":
-            method = SemiGradientSarsaCNN(env_train, device=device)
+            method = SemiGradientSarsaCNN[tuple[torch.Tensor, int]](
+                env_train, device=device
+            )
         elif method_name == "semi_gradient_sarsa_n_cnn":
-            method = SemiGradientSarsaNCNN(env_train, device=device)
+            method = SemiGradientSarsaNCNN[tuple[torch.Tensor, int]](
+                env_train, device=device
+            )
         else:
             raise ValueError(f"Unknown solution method {method_name}")
 

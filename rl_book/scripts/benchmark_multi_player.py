@@ -3,7 +3,7 @@ import argparse
 import torch
 from pettingzoo.classic import connect_four_v3, tictactoe_v3
 
-from rl_book.env import ConnectFourEnv, MultiPlayerEnv, ObsMode, TicTacToeEnv
+from rl_book.env import ConnectFourEnv, MultiPlayerEnv, TicTacToeEnv
 from rl_book.methods.inference import test_against_user
 from rl_book.methods.mc import OffPolicyMC, OnPolicyMC
 from rl_book.methods.method import MethodWithStats
@@ -12,7 +12,6 @@ from rl_book.methods.planning import DynaQ
 from rl_book.methods.td import DoubleQ, ExpectedSarsa, QLearning, Sarsa
 from rl_book.methods.td_approx import (CNNConnectFour, CNNTicTacToe,
                                        SemiGradientSarsaCNN,
-                                       SemiGradientSarsaLinear,
                                        SemiGradientSarsaNCNN)
 from rl_book.methods.td_n import SarsaN, TreeN
 from rl_book.methods.training import train_multi_player
@@ -45,15 +44,14 @@ def benchmark_multi_player(
     methods = [
         MethodWithStats(Random(env)),
         MethodWithStats(OnPolicyMC(env, load_weights=load_weights)),
-        # MethodWithStats(OffPolicyMC(env, load_weights=load_weights)),
+        MethodWithStats(OffPolicyMC(env, load_weights=load_weights)),
         MethodWithStats(QLearning(env, load_weights=load_weights)),
-        # MethodWithStats(Sarsa(env, load_weights=load_weights)),
-        # MethodWithStats(ExpectedSarsa(env, load_weights=load_weights)),
-        # MethodWithStats(DoubleQ(env, load_weights=load_weights)),
-        # MethodWithStats(SarsaN(env, load_weights=load_weights)),
-        # MethodWithStats(TreeN(env, load_weights=load_weights)),
-        # MethodWithStats(DynaQ(env, load_weights=load_weights)),
-        # MethodWithStats(SemiGradientSarsaLinear(env, load_weights=load_weights)),
+        MethodWithStats(Sarsa(env, load_weights=load_weights)),
+        MethodWithStats(ExpectedSarsa(env, load_weights=load_weights)),
+        MethodWithStats(DoubleQ(env, load_weights=load_weights)),
+        MethodWithStats(SarsaN(env, load_weights=load_weights)),
+        MethodWithStats(TreeN(env, load_weights=load_weights)),
+        MethodWithStats(DynaQ(env, load_weights=load_weights)),
         MethodWithStats(
             SemiGradientSarsaCNN(
                 env,

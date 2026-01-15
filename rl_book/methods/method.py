@@ -1,10 +1,10 @@
 import os
 import pickle
 from abc import ABC
-from enum import Enum
-from typing import Any, Generic, TypeVar
+from typing import Any, ClassVar, Generic, TypeVar
 
 import numpy as np
+import torch
 
 from rl_book.env import GameResult, ObsMode, ParametrizedEnv
 from rl_book.replay_utils import ReplayItem
@@ -16,15 +16,17 @@ S = TypeVar("S")
 class RLMethod(Generic[S], ABC):
     """Base class for RL methods."""
 
+    obs_mode: ClassVar[ObsMode] = ObsMode.DEFAULT
+
     def __init__(
         self,
         env: ParametrizedEnv,
         load_weights: bool = False,
-        obs_mode: ObsMode = ObsMode.DEFAULT,
+        device: torch.device = torch.device("cpu"),
     ) -> None:
         self.env = env
         self._train = True
-        self.obs_mode = obs_mode
+        self.device = device
 
         if load_weights:
             self.load_weights()
@@ -71,7 +73,7 @@ class RLMethod(Generic[S], ABC):
         pass
 
     def clone(self):
-        cloned = self.__class__(self.env, obs_mode=self.obs_mode)
+        cloned = self.__class__(self.env, device=self.device)
         return cloned
 
     def get_allowed_actions(self, mask: np.ndarray | list) -> np.ndarray:

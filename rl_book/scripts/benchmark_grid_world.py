@@ -91,7 +91,7 @@ def plot_results(
     max_grid_size: int,
     fig_path: str,
 ) -> None:
-    x_values = [10, 20, 30, 40, 50]  # [n for n in range(min_grid_size, max_grid_size)]
+    x_values = [n for n in range(min_grid_size, max_grid_size)]
     markers = ["o", "s", "^", "*"]
 
     for idx, y_values in enumerate(needed_steps):
@@ -102,7 +102,7 @@ def plot_results(
             label=methods[idx].__name__,
         )
         plt.legend()
-        plt.xticks([10, 20, 30, 40, 50])
+        # plt.xticks([10, 20, 30, 40, 50])
         plt.xlabel("Gridworld size")
         plt.ylabel("Steps needed")
 
@@ -111,9 +111,9 @@ def plot_results(
 
 
 def benchmark(
-    methods: list,
+    methods: list[type[RLMethod]],
     min_grid_size=5,
-    max_grid_size=26,
+    max_grid_size=6,
     extra_rewards: bool = True,
     eps_decay: bool = True,
     fig_path: str = "result.png",
@@ -130,18 +130,12 @@ def benchmark(
     """
     steps_needed: list[list[int]] = [[] for _ in range(len(methods))]
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    rasterized_models = ["SemiGradientSarsaCNN", "SemiGradientSarsaNCNN"]
 
     # Iterate over all possible grid sizes.
-    for n in [50]:
+    for n in range(min_grid_size, max_grid_size):
         start = time.time()
         # Iterate over all methods.
         for idx, method_ in enumerate(methods):
-            obs_mode = (
-                ObsMode.RASTERIZED
-                if method_.__name__ in rasterized_models
-                else ObsMode.DEFAULT
-            )
             # For faster results and reduced variance (e.g. unlucky initialization)
             # try increasing maximal number of steps, and run multiple trainings
             # with each threshold - then store the best run.
@@ -150,12 +144,9 @@ def benchmark(
                 steps_needed_cur: list[int] = []
                 for _ in range(TRIES_PER_STEP):
                     env = generate_random_env(
-                        n, extra_rewards, eps_decay, obs_mode, device
+                        n, extra_rewards, eps_decay, method_.obs_mode, device
                     )
-                    if method_.__name__ in rasterized_models:
-                        method = method_(env, device=device)
-                    else:
-                        method = method_(env)
+                    method = method_(env, device=device)
                     callback = partial(success_callback, env=env.env)
                     max_s = (
                         max_steps + 1
@@ -181,25 +172,21 @@ def benchmark(
 
 
 if __name__ == "__main__":
-    # benchmark(
-    #     [OnPolicyMC, OffPolicyMC],
-    #     fig_path="results/mc.png",
-    # )
-    # benchmark([Sarsa, QLearning, ExpectedSarsa, DoubleQ], fig_path="results/td.png")
-    # benchmark([SarsaN, TreeN], fig_path="results/td_n.png")
-    # benchmark(
-    #     [DynaQ],
-    #     fig_path="results/planning.png",
-    # )
-    # benchmark(
-    #     [SemiGradientSarsaLinear, SemiGradientSarsaCNN, SemiGradientSarsaNCNN],
-    #     fig_path="results/td_approx.png",
-    # )
-    # benchmark(
-    #     [OnPolicyMC, Sarsa, QLearning, SarsaN, TreeN, DynaQ],
-    #     fig_path="results/td_approx.png",
-    # )
     benchmark(
-        [SemiGradientSarsaCNN],
-        fig_path="results/sarsa_approx.png",
+        [OnPolicyMC, OffPolicyMC],
+        fig_path="results/mc.png",
+    )
+    benchmark([Sarsa, QLearning, ExpectedSarsa, DoubleQ], fig_path="results/td.png")
+    benchmark([SarsaN, TreeN], fig_path="results/td_n.png")
+    benchmark(
+        [DynaQ],
+        fig_path="results/planning.png",
+    )
+    benchmark(
+        [
+            SemiGradientSarsaLinear[tuple[torch.Tensor, int]],
+            SemiGradientSarsaCNN[tuple[torch.Tensor, int]],
+            SemiGradientSarsaNCNN[tuple[torch.Tensor, int]],
+        ],
+        fig_path="results/td_approx.png",
     )

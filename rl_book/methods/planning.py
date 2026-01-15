@@ -5,6 +5,7 @@ from collections import defaultdict
 from typing import Any, DefaultDict, Optional
 
 import numpy as np
+import torch
 
 from rl_book.env import ParametrizedEnv
 from rl_book.methods.method import RLMethod
@@ -38,10 +39,11 @@ class DynaQ(RLMethod[int]):
         self,
         env: ParametrizedEnv,
         load_weights: bool = False,
+        device: torch.device = torch.device("cpu"),
         n: int = 3,
         plus_mode: bool = False,
     ):
-        super().__init__(env, load_weights)
+        super().__init__(env, load_weights, device)
         self.Q: DefaultDict[tuple[int, int], float] = defaultdict(float)
         self.n = n
         self.buffer = ReplayBuffer()

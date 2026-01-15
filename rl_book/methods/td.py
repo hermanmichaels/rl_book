@@ -6,6 +6,7 @@ from collections import defaultdict
 from typing import Any, DefaultDict
 
 import numpy as np
+import torch
 
 from rl_book.env import ParametrizedEnv
 from rl_book.methods.method import RLMethod
@@ -14,9 +15,14 @@ from rl_book.replay_utils import ReplayItem
 ALPHA = 0.1
 
 
-class TDMethod(RLMethod, ABC):
-    def __init__(self, env: ParametrizedEnv, load_weights: bool = False) -> None:
-        super().__init__(env, load_weights)
+class TDMethod(RLMethod[int], ABC):
+    def __init__(
+        self,
+        env: ParametrizedEnv,
+        load_weights: bool = False,
+        device: torch.device = torch.device("cpu"),
+    ) -> None:
+        super().__init__(env, load_weights, device)
         self.Q: DefaultDict[tuple[int, int], float] = defaultdict(float)
 
     def clone(self) -> "TDMethod":
@@ -62,9 +68,6 @@ class Sarsa(TDMethod):
             + self.env.gamma * self.Q[cur_state.state, cur_state.action]
             - self.Q[prev_state.state, prev_state.action]
         )
-
-        # import ipdb
-        # ipdb.set_trace()
 
     def finalize(self, episode: list[ReplayItem[int]], step: int) -> None:
         self.update(episode, step)
@@ -139,8 +142,13 @@ class DoubleQ(TDMethod):
     def get_name(self) -> str:
         return "DoubleQ"
 
-    def __init__(self, env: ParametrizedEnv, load_weights: bool = False) -> None:
-        super().__init__(env, load_weights)
+    def __init__(
+        self,
+        env: ParametrizedEnv,
+        load_weights: bool = False,
+        device: torch.device = torch.device("cpu"),
+    ) -> None:
+        super().__init__(env, load_weights, device)
         self.Q_2: DefaultDict[tuple[int, int], float] = defaultdict(float)
 
     def update(self, episode: list[ReplayItem[int]], step: int) -> None:

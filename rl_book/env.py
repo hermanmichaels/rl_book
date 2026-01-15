@@ -95,7 +95,7 @@ class GridWorldEnv(ParametrizedEnv):
 
     def step(
         self, action: int, old_obs: int | tuple[torch.Tensor, int]
-    ) -> tuple[int, float, bool, bool, dict]:
+    ) -> tuple[int | tuple[torch.Tensor, int], float, bool, bool, dict]:
         """Executes a step in the environment and, among others, returns new observation
         and observed reward.
         When "intermediate_rewards" is set, augment the reward by a progress heuristic,
@@ -228,7 +228,7 @@ class MultiPlayerEnv(ParametrizedEnv):
 
     def obs_to_state(
         self, obs: Any, player_pos: int = 0, obs_mode: ObsMode = ObsMode.DEFAULT
-    ) -> int:
+    ) -> int | torch.Tensor:
         raise NotImplementedError
 
     def get_game_result(self, reward) -> GameResult:
@@ -247,7 +247,7 @@ class TicTacToeEnv(MultiPlayerEnv):
 
     def obs_to_state(
         self, obs: Any, start_pos: int = 0, obs_mode: ObsMode = ObsMode.DEFAULT
-    ) -> int:
+    ) -> int | torch.Tensor:
         if obs_mode == ObsMode.DEFAULT:
             board = obs  # shape: (3, 3, 2)
             state_flat = []
@@ -270,12 +270,9 @@ class TicTacToeEnv(MultiPlayerEnv):
 
             return state
         elif obs_mode == ObsMode.RASTERIZED:
-            return (
-                torch.as_tensor(
-                    np.transpose(obs, [2, 1, 0]), device=self.device
-                ).float(),
-                0,
-            )  # 0 # TODO: to satisfy
+            return torch.as_tensor(
+                np.transpose(obs, [2, 1, 0]), device=self.device
+            ).float()
 
     def get_game_result(self, reward: float) -> GameResult:
         if reward == 1:

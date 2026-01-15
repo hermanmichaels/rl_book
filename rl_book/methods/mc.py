@@ -5,6 +5,7 @@ from collections import defaultdict
 from typing import Any, DefaultDict
 
 import numpy as np
+import torch
 
 from rl_book.env import ParametrizedEnv
 from rl_book.methods.method import RLMethod
@@ -13,8 +14,13 @@ from rl_book.utils import ConstantFactory
 
 
 class MCMethod(RLMethod[int], ABC):
-    def __init__(self, env: ParametrizedEnv, load_weights: bool = False) -> None:
-        super().__init__(env, load_weights)
+    def __init__(
+        self,
+        env: ParametrizedEnv,
+        load_weights: bool = False,
+        device: torch.device = torch.device("cpu"),
+    ) -> None:
+        super().__init__(env, load_weights, device)
         self.Q: DefaultDict[tuple[int, int], float] = defaultdict(float)
         self.pi: DefaultDict[tuple[int, int], float] = defaultdict(
             ConstantFactory(1.0 / self.env.get_action_space_len())
@@ -48,8 +54,13 @@ class MCMethod(RLMethod[int], ABC):
 
 
 class OnPolicyMC(MCMethod):
-    def __init__(self, env: ParametrizedEnv, load_weights: bool = False):
-        super().__init__(env, load_weights)
+    def __init__(
+        self,
+        env: ParametrizedEnv,
+        load_weights: bool = False,
+        device: torch.device = torch.device("cpu"),
+    ):
+        super().__init__(env, load_weights, device=device)
         self.counts: DefaultDict[tuple[int, int], int] = defaultdict(int)
 
     def get_name(self) -> str:
@@ -92,7 +103,12 @@ class OnPolicyMC(MCMethod):
 
 
 class OffPolicyMC(MCMethod):
-    def __init__(self, env: ParametrizedEnv, load_weights: bool = False):
+    def __init__(
+        self,
+        env: ParametrizedEnv,
+        load_weights: bool = False,
+        device: torch.device = torch.device("cpu"),
+    ):
         super().__init__(env, load_weights)
         self.C: DefaultDict[tuple[int, int], float] = defaultdict(int)
 

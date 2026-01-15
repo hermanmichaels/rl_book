@@ -1,6 +1,7 @@
 from collections import defaultdict
 
 import numpy as np
+import torch
 
 from rl_book.env import ParametrizedEnv
 from rl_book.methods.td import TDMethod
@@ -12,9 +13,13 @@ ALPHA = 0.1
 
 class SarsaN(TDMethod):
     def __init__(
-        self, env: ParametrizedEnv, load_weights: bool = False, n: int = 3
+        self,
+        env: ParametrizedEnv,
+        load_weights: bool = False,
+        device: torch.device = torch.device("cpu"),
+        n: int = 3,
     ) -> None:
-        super().__init__(env, load_weights)
+        super().__init__(env, load_weights, device)
         self.n = n
 
     def get_name(self) -> str:
@@ -60,8 +65,14 @@ class SarsaN(TDMethod):
 
 
 class TreeN(TDMethod):
-    def __init__(self, env: ParametrizedEnv, load_weights: bool = False, n: int = 3):
-        super().__init__(env, load_weights)
+    def __init__(
+        self,
+        env: ParametrizedEnv,
+        load_weights: bool = False,
+        device: torch.device = torch.device("cpu"),
+        n: int = 3,
+    ):
+        super().__init__(env, load_weights, device)
         self.Q = defaultdict(ConstantFactory(0.1))
         self.n = n
 
