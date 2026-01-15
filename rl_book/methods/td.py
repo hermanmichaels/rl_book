@@ -3,10 +3,10 @@ import pickle
 import random
 from abc import ABC
 from collections import defaultdict
-from typing import Any, DefaultDict, override
+from typing import Any, DefaultDict
 
 import numpy as np
-import torch
+from typing_extensions import override
 
 from rl_book.env import ParametrizedEnv
 from rl_book.methods.method import RLMethod
@@ -17,14 +17,11 @@ ALPHA = 0.1
 
 class TDMethod(RLMethod[int], ABC):
     def __init__(
-        self,
-        env: ParametrizedEnv,
-        load_weights: bool = False,
-        device: torch.device = torch.device("cpu"),
+        self, env: ParametrizedEnv, load_weights: bool = False, **kwargs: object
     ) -> None:
         self.Q: DefaultDict[tuple[int, int], float] = defaultdict(float)
 
-        super().__init__(env, load_weights, device)
+        super().__init__(env, load_weights, **kwargs)
 
     @override
     def clone(self) -> "TDMethod":
@@ -178,14 +175,11 @@ class DoubleQ(TDMethod):
         return "DoubleQ"
 
     def __init__(
-        self,
-        env: ParametrizedEnv,
-        load_weights: bool = False,
-        device: torch.device = torch.device("cpu"),
+        self, env: ParametrizedEnv, load_weights: bool = False, **kwargs: object
     ) -> None:
         self.Q_2: DefaultDict[tuple[int, int], float] = defaultdict(float)
 
-        super().__init__(env, load_weights, device)
+        super().__init__(env, load_weights, **kwargs)
 
     def _update(self, Q1, Q2, cur_state, next_state):
         if next_state:

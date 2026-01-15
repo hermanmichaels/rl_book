@@ -8,9 +8,10 @@ from gymnasium.core import Env
 from rl_book.env import generate_random_grid_world_env
 from rl_book.methods.mc import OffPolicyMC, OnPolicyMC
 from rl_book.methods.method import RLMethod
+from rl_book.methods.models import GridWorldCNN
 from rl_book.methods.planning import DynaQ
 from rl_book.methods.td import DoubleQ, ExpectedSarsa, QLearning, Sarsa
-from rl_book.methods.td_approx import (GridWorldCNN, SemiGradientSarsaCNN,
+from rl_book.methods.td_approx import (SemiGradientSarsaCNN,
                                        SemiGradientSarsaLinear,
                                        SemiGradientSarsaNCNN)
 from rl_book.methods.td_n import SarsaN, TreeN
@@ -106,7 +107,7 @@ def benchmark(
     steps_needed: list[list[int]] = [[] for _ in range(len(methods))]
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-    ns = [5, 15, 25] # range(min_grid_size, max_grid_size)
+    ns = [5, 15, 25]  # range(min_grid_size, max_grid_size)
 
     # Iterate over all possible grid sizes.
     for n in ns:
@@ -168,8 +169,8 @@ if __name__ == "__main__":
     benchmark(
         [
             SemiGradientSarsaLinear[tuple[torch.Tensor, int]],
-            SemiGradientSarsaCNN[tuple[torch.Tensor, int]],
-            SemiGradientSarsaNCNN[tuple[torch.Tensor, int]],
+            SemiGradientSarsaCNN[tuple[torch.Tensor, int], GridWorldCNN],
+            SemiGradientSarsaNCNN[tuple[torch.Tensor, int], GridWorldCNN],
         ],
         fig_path="results/td_approx.png",
     )

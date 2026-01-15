@@ -9,9 +9,10 @@ from rl_book.methods.dp import policy_iteration, value_iteration
 from rl_book.methods.inference import test_single_player
 from rl_book.methods.mc import OffPolicyMC, OnPolicyMC
 from rl_book.methods.method import RLMethod
+from rl_book.methods.models import GridWorldCNN
 from rl_book.methods.planning import DynaQ
 from rl_book.methods.td import DoubleQ, ExpectedSarsa, QLearning, Sarsa
-from rl_book.methods.td_approx import (GridWorldCNN, SemiGradientSarsaCNN,
+from rl_book.methods.td_approx import (SemiGradientSarsaCNN,
                                        SemiGradientSarsaLinear,
                                        SemiGradientSarsaNCNN)
 from rl_book.methods.td_n import SarsaN, TreeN
@@ -66,11 +67,11 @@ def solve_grid_world(method_name: str) -> None:
         elif method_name == "semi_gradient_sarsa_linear":
             method = SemiGradientSarsaLinear[tuple[torch.Tensor, int]](env_train)
         elif method_name == "semi_gradient_sarsa_cnn":
-            method = SemiGradientSarsaCNN[tuple[torch.Tensor, int]](
+            method = SemiGradientSarsaCNN[tuple[torch.Tensor, int], GridWorldCNN](
                 env_train, device=device, network_class=GridWorldCNN
             )
         elif method_name == "semi_gradient_sarsa_n_cnn":
-            method = SemiGradientSarsaNCNN[tuple[torch.Tensor, int]](
+            method = SemiGradientSarsaNCNN[tuple[torch.Tensor, int], GridWorldCNN](
                 env_train, device=device, network_class=GridWorldCNN
             )
         else:

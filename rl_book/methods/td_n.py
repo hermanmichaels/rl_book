@@ -1,8 +1,7 @@
 from collections import defaultdict
-from typing import override
 
 import numpy as np
-import torch
+from typing_extensions import override
 
 from rl_book.env import ParametrizedEnv
 from rl_book.methods.td import TDMethod
@@ -17,11 +16,11 @@ class SarsaN(TDMethod):
         self,
         env: ParametrizedEnv,
         load_weights: bool = False,
-        device: torch.device = torch.device("cpu"),
         n: int = 3,
+        **kwargs: object
     ) -> None:
         self.n = n
-        super().__init__(env, load_weights, device)
+        super().__init__(env, load_weights, **kwargs)
 
     @override
     def get_name(self) -> str:
@@ -73,10 +72,10 @@ class TreeN(TDMethod):
         self,
         env: ParametrizedEnv,
         load_weights: bool = False,
-        device: torch.device = torch.device("cpu"),
         n: int = 3,
+        **kwargs: object
     ):
-        super().__init__(env, load_weights, device)
+        super().__init__(env, load_weights, **kwargs)
         self.Q = defaultdict(ConstantFactory(0.1))
         self.n = n
 

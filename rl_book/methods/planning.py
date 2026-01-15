@@ -2,10 +2,10 @@ import copy
 import pickle
 import random
 from collections import defaultdict
-from typing import Any, DefaultDict, Optional, override
+from typing import Any, DefaultDict, Optional
 
 import numpy as np
-import torch
+from typing_extensions import override
 
 from rl_book.env import ParametrizedEnv
 from rl_book.methods.method import RLMethod
@@ -39,9 +39,9 @@ class DynaQ(RLMethod[int]):
         self,
         env: ParametrizedEnv,
         load_weights: bool = False,
-        device: torch.device = torch.device("cpu"),
         n: int = 3,
         plus_mode: bool = False,
+        **kwargs: object
     ):
         self.Q: DefaultDict[tuple[int, int], float] = defaultdict(float)
         self.n = n
@@ -51,7 +51,7 @@ class DynaQ(RLMethod[int]):
         ] = defaultdict(model_factory)
         self.plus_mode = plus_mode
 
-        super().__init__(env, load_weights, device)
+        super().__init__(env, load_weights, **kwargs)
 
     @override
     def get_name(self) -> str:
@@ -59,7 +59,7 @@ class DynaQ(RLMethod[int]):
 
     @override
     def clone(self):
-        cloned = self.__class__(self.env, False, self.device, self.n, self.plus_mode)
+        cloned = self.__class__(self.env, False, self.n, self.plus_mode)
         cloned.Q = copy.deepcopy(self.Q)
         return cloned
 

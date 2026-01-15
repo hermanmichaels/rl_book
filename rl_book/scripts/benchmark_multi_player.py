@@ -43,15 +43,15 @@ def benchmark_multi_player(
 
     methods = [
         MethodWithStats(Random(env)),
-        # MethodWithStats(OnPolicyMC(env, load_weights=load_weights)),
-        # MethodWithStats(OffPolicyMC(env, load_weights=load_weights)),
-        # MethodWithStats(QLearning(env, load_weights=load_weights)),
-        # MethodWithStats(Sarsa(env, load_weights=load_weights)),
-        # MethodWithStats(ExpectedSarsa(env, load_weights=load_weights)),
-        # MethodWithStats(DoubleQ(env, load_weights=load_weights)),
-        # MethodWithStats(SarsaN(env, load_weights=load_weights)),
-        # MethodWithStats(TreeN(env, load_weights=load_weights)),
-        # MethodWithStats(DynaQ(env, load_weights=load_weights)),
+        MethodWithStats(OnPolicyMC(env, load_weights=load_weights)),
+        MethodWithStats(OffPolicyMC(env, load_weights=load_weights)),
+        MethodWithStats(QLearning(env, load_weights=load_weights)),
+        MethodWithStats(Sarsa(env, load_weights=load_weights)),
+        MethodWithStats(ExpectedSarsa(env, load_weights=load_weights)),
+        MethodWithStats(DoubleQ(env, load_weights=load_weights)),
+        MethodWithStats(SarsaN(env, load_weights=load_weights)),
+        MethodWithStats(TreeN(env, load_weights=load_weights)),
+        MethodWithStats(DynaQ(env, load_weights=load_weights)),
         MethodWithStats(
             SemiGradientSarsaCNN(
                 env,

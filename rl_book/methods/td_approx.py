@@ -2,12 +2,13 @@ import copy
 import pickle
 import random
 from abc import ABC, abstractmethod
-from typing import Any, ClassVar, Generic, Type, TypeVar, override
+from typing import Any, ClassVar, Generic, Type, TypeVar
 
 import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from typing_extensions import override
 
 from rl_book.env import ObsMode, ParametrizedEnv
 from rl_book.methods.method import RLMethod
@@ -25,8 +26,11 @@ class ApproximateTDMethod(RLMethod[S], Generic[S], ABC):
         env: ParametrizedEnv,
         load_weights: bool = False,
         device: torch.device = torch.device("cpu"),
+        **kwargs: object,
     ) -> None:
-        super().__init__(env, load_weights, device)
+        self.device = device
+
+        super().__init__(env, load_weights, **kwargs)
 
     def clone(self) -> "ApproximateTDMethod":
         cloned = self.__class__(self.env, False)
@@ -77,12 +81,13 @@ class SemiGradientSarsaLinear(ApproximateTDMethod[S], Generic[S]):
         env: ParametrizedEnv,
         load_weights: bool = False,
         device: torch.device = torch.device("cpu"),
+        **kwargs: object,
     ) -> None:
         self.num_states = env.get_observation_space_len()
         self.num_actions = env.get_action_space_len()
         self.w = np.zeros(self.num_states * self.num_actions)
 
-        super().__init__(env, load_weights, device)
+        super().__init__(env, load_weights, device, **kwargs)
 
     @override
     def clone(self) -> "SemiGradientSarsaLinear":
@@ -94,7 +99,6 @@ class SemiGradientSarsaLinear(ApproximateTDMethod[S], Generic[S]):
     def get_name(self) -> str:
         return "SemiGradientSarsa-Linear"
 
-    @override
     def feature_fn(self, state: S, action: int) -> np.ndarray:
         """Simple feature function returning a one-hot representation
         of state and action.
@@ -160,10 +164,7 @@ class SemiGradientSarsaLinear(ApproximateTDMethod[S], Generic[S]):
             self.w = pickle.load(f)
 
 
-
-
-
-class SemiGradientSarsaCNN(ApproximateTDMethod[S], Generic[S]):
+class SemiGradientSarsaCNN(ApproximateTDMethod[S], Generic[S, T]):
     obs_mode: ClassVar[ObsMode] = ObsMode.RASTERIZED
 
     def __init__(
@@ -172,6 +173,7 @@ class SemiGradientSarsaCNN(ApproximateTDMethod[S], Generic[S]):
         load_weights: bool = False,
         device: torch.device = torch.device("cpu"),
         network_class: Type[T] | None = None,
+        **kwargs: object,
     ) -> None:
         assert network_class is not None, "network_class must be set"
 
@@ -181,7 +183,7 @@ class SemiGradientSarsaCNN(ApproximateTDMethod[S], Generic[S]):
         self.network_class = network_class
         self.all_actions = np.asarray([a for a in range(num_actions)])
 
-        super().__init__(env, load_weights, device)
+        super().__init__(env, load_weights, device, **kwargs)
 
     @override
     def clone(self) -> "SemiGradientSarsaCNN":
@@ -279,6 +281,7 @@ class SemiGradientSarsaNCNN(ApproximateTDMethod[S], Generic[S]):
         device: torch.device = torch.device("cpu"),
         network_class: Type[T] | None = None,
         n: int = 3,
+        **kwargs: object,
     ) -> None:
         assert network_class is not None, "network_class must be set"
 
@@ -288,7 +291,7 @@ class SemiGradientSarsaNCNN(ApproximateTDMethod[S], Generic[S]):
         self.network_class = network_class
         self.n = n
 
-        super().__init__(env, load_weights, device)
+        super().__init__(env, load_weights, device, **kwargs)
 
     def clone(self) -> "SemiGradientSarsaNCNN":
         cloned = self.__class__(
@@ -378,4 +381,3 @@ class SemiGradientSarsaNCNN(ApproximateTDMethod[S], Generic[S]):
         with open(save_path, "rb") as f:
             state_dict = pickle.load(f)
             self.model.load_state_dict(state_dict)
-

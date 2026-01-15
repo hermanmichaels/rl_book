@@ -1,5 +1,5 @@
 from enum import Enum
-from typing import Any, Generic, Literal, TypeVar, overload
+from typing import Any, Generic, Literal, TypeVar, cast, overload
 
 import gymnasium as gym
 import numpy as np
@@ -50,7 +50,7 @@ def generate_random_grid_world_env(
     eps_decay: bool,
     obs_mode: ObsMode,
     device: torch.device = torch.device("cpu"),
-) -> tuple["GridWorldEnv[int | tuple[torch.Tensor, int]]", list[str]]:
+) -> tuple["GridWorldEnv[int] | GridWorldEnv[tuple[torch.Tensor, int]]", list[str],]:
     ...
 
 
@@ -191,11 +191,11 @@ class GridWorldEnv(ParametrizedEnv[S], Generic[S]):
 
     def get_action_space_len(self) -> int:
         assert isinstance(self.env.action_space, Discrete)
-        return int(self.env.action_space.n)
+        return cast(int, self.env.action_space.n)
 
     def get_observation_space_len(self) -> int:
         assert isinstance(self.env.observation_space, Discrete)
-        return int(self.env.observation_space.n)
+        return cast(int, self.env.observation_space.n)
 
     def get_max_num_steps(self) -> int:
         return self.grid_size**2 * 4

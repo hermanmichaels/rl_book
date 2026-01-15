@@ -2,10 +2,10 @@ import copy
 import pickle
 from abc import ABC
 from collections import defaultdict
-from typing import Any, DefaultDict, override
+from typing import Any, DefaultDict
 
 import numpy as np
-import torch
+from typing_extensions import override
 
 from rl_book.env import ParametrizedEnv
 from rl_book.methods.method import RLMethod
@@ -15,17 +15,14 @@ from rl_book.utils import ConstantFactory
 
 class MCMethod(RLMethod[int], ABC):
     def __init__(
-        self,
-        env: ParametrizedEnv,
-        load_weights: bool = False,
-        device: torch.device = torch.device("cpu"),
+        self, env: ParametrizedEnv, load_weights: bool = False, **kwargs: object
     ) -> None:
         self.Q: DefaultDict[tuple[int, int], float] = defaultdict(float)
         self.pi: DefaultDict[tuple[int, int], float] = defaultdict(
             ConstantFactory(1.0 / env.get_action_space_len())
         )
 
-        super().__init__(env, load_weights, device)
+        super().__init__(env, load_weights, **kwargs)
 
     @override
     def clone(self):
@@ -61,14 +58,11 @@ class MCMethod(RLMethod[int], ABC):
 
 class OnPolicyMC(MCMethod):
     def __init__(
-        self,
-        env: ParametrizedEnv,
-        load_weights: bool = False,
-        device: torch.device = torch.device("cpu"),
+        self, env: ParametrizedEnv, load_weights: bool = False, **kwargs: object
     ):
         self.counts: DefaultDict[tuple[int, int], int] = defaultdict(int)
 
-        super().__init__(env, load_weights, device=device)
+        super().__init__(env, load_weights, **kwargs)
 
     @override
     def get_name(self) -> str:
@@ -113,14 +107,11 @@ class OnPolicyMC(MCMethod):
 
 class OffPolicyMC(MCMethod):
     def __init__(
-        self,
-        env: ParametrizedEnv,
-        load_weights: bool = False,
-        device: torch.device = torch.device("cpu"),
+        self, env: ParametrizedEnv, load_weights: bool = False, **kwargs: object
     ):
         self.C: DefaultDict[tuple[int, int], float] = defaultdict(int)
 
-        super().__init__(env, load_weights)
+        super().__init__(env, load_weights, **kwargs)
 
     @override
     def get_name(self) -> str:
@@ -144,7 +135,7 @@ class OffPolicyMC(MCMethod):
         # Note: self.pi is here used as the behavior policy b, while the target policy π
         # is implicity represented by argmax(Q).
         G = 0.0
-        W = 1
+        W = 1.0
         for t in range(len(episode) - 1, -1, -1):
             s = episode[t].state
             a = episode[t].action

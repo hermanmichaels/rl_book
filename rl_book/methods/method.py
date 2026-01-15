@@ -4,7 +4,6 @@ from abc import ABC
 from typing import Any, ClassVar, Generic, TypeVar
 
 import numpy as np
-import torch
 
 from rl_book.env import GameResult, ObsMode, ParametrizedEnv
 from rl_book.replay_utils import ReplayItem
@@ -19,14 +18,10 @@ class RLMethod(Generic[S], ABC):
     obs_mode: ClassVar[ObsMode] = ObsMode.DEFAULT
 
     def __init__(
-        self,
-        env: ParametrizedEnv,
-        load_weights: bool = False,
-        device: torch.device = torch.device("cpu"),
+        self, env: ParametrizedEnv, load_weights: bool = False, **_: object
     ) -> None:
         self.env = env
         self._train = True
-        self.device = device
 
         if load_weights:
             self.load_weights()
@@ -73,7 +68,7 @@ class RLMethod(Generic[S], ABC):
         pass
 
     def clone(self):
-        cloned = self.__class__(self.env, device=self.device)
+        cloned = self.__class__(self.env)
         return cloned
 
     def _is_empty_mask(self, mask) -> bool:

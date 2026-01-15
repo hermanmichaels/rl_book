@@ -3,6 +3,34 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 
+class GridWorldCNN(nn.Module):
+    """Simple CNN to process rasterized GridWorld images and output Q values."""
+
+    def __init__(self, num_actions: int) -> None:
+        super().__init__()
+
+        self.conv1 = nn.Conv2d(3, 16, kernel_size=2, padding=0)
+        self.conv2 = nn.Conv2d(16, 32, kernel_size=2, padding=0)
+        self.pool = nn.AdaptiveAvgPool2d(1)
+        self.fc = nn.Linear(32, num_actions)
+
+    def forward(self, x: torch.Tensor):
+        """Forward call.
+
+        Args:
+            x: input tensor [bs, C, H, W]
+
+        Returns:
+            Q values [bs, num_actions]
+        """
+        x = F.relu(self.conv1(x))
+        x = F.relu(self.conv2(x))
+        x = self.pool(x)
+        x = x.view(x.size(0), -1)
+        x = self.fc(x)
+        return x
+
+
 class TicTacToeMLP(nn.Module):
     """Simple CNN to process rasterized GridWorld images and output Q values."""
 
