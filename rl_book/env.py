@@ -3,7 +3,16 @@ from typing import Any
 
 import numpy as np
 from gymnasium.core import Env  # TODO: or any other env
-from gymnasium.spaces import Discrete
+from gymnasium.spaces import Discrete, Box
+import gymnasium as gym
+import matplotlib.pyplot as plt
+import math
+import torch
+
+class ObsMode(Enum):
+    INVALID = 0
+    DEFAULT = 1
+    RASTERIZED = 2
 
 
 class ParametrizedEnv:
@@ -57,21 +66,23 @@ class GridWorldEnv(ParametrizedEnv):
     """Env wrapper for "Grid world"."""
 
     def __init__(
-        self, env: Env, gamma: float, eps_decay: bool, intermediate_rewards: bool
+        self, env: Env, gamma: float, eps_decay: bool, intermediate_rewards: bool, obs_mode: ObsMode, device: torch.device
     ) -> None:
-        super().__init__(env, gamma, eps_decay)
+        if obs_mode == ObsMode.RASTERIZED:
+            super().__init__(GridWorldImageWrapper(env, device), gamma, eps_decay)
+        else:
+            super().__init__(env, gamma, eps_decay)
 
         self.intermediate_rewards = intermediate_rewards
+        self.obs_mode = obs_mode
+        self.grid_size = env.unwrapped.desc.shape[0]
 
     def normalized_grid_position_sum(self, observation: int) -> float:
         """Computes the normalized row / column index of the passed observation.
         Used for reward heuristics under the assumption that a higher such
         value is better / closer to the goal.
         """
-        assert isinstance(self.env.observation_space, Discrete)
-        observation_space: Discrete = self.env.observation_space
-        grid_size = np.sqrt(observation_space.n)
-        return (observation // grid_size + observation % grid_size) / grid_size
+        return (observation // self.grid_size + observation % self.grid_size) / self.grid_size
 
     def step(self, action: int, old_obs: int) -> tuple[int, float, bool, bool, dict]:
         """Executes a step in the environment and, among others, returns new observation
@@ -92,10 +103,18 @@ class GridWorldEnv(ParametrizedEnv):
         """
         observation, reward, terminated, truncated, info = self.env.step(action)
         reward = float(reward)
+
         if self.intermediate_rewards:
+            if self.obs_mode == ObsMode.RASTERIZED:
+                _, obs_for_intermediate = observation
+                _, old_obs_for_intermediate = old_obs
+            else:
+                obs_for_intermediate = observation
+                old_obs_for_intermediate = old_obs
+
             reward += self.normalized_grid_position_sum(
-                observation
-            ) - self.normalized_grid_position_sum(old_obs)
+                obs_for_intermediate
+            ) - self.normalized_grid_position_sum(old_obs_for_intermediate)
         return observation, reward, terminated, truncated, info
 
     def get_action_space_len(self) -> int:
@@ -107,8 +126,94 @@ class GridWorldEnv(ParametrizedEnv):
         return int(self.env.observation_space.n)
 
     def get_max_num_steps(self) -> int:
-        assert isinstance(self.env.observation_space, Discrete)
-        return int(self.env.observation_space.n) * 4
+        return self.grid_size**2 * 4
+    
+def show_grid_image(obs):
+    """
+    obs: np.array with shape (3, H, W)
+    Plots a single RGB image for inspection.
+    """
+    H, W = obs.shape[1], obs.shape[2]
+
+    # Combine channels into RGB
+    # Agent: red, Goal: green, Walls: blue
+    rgb = np.zeros((H, W, 3), dtype=np.float32)
+    rgb[..., 0] = obs[0]  # agent
+    rgb[..., 1] = obs[1]  # goal
+    rgb[..., 2] = obs[2]  # walls
+
+    plt.figure(figsize=(5,5))
+    plt.imshow(rgb, interpolation='nearest')
+    plt.grid(True, color='gray', linewidth=1)
+    plt.xticks(np.arange(-0.5, W, 1), [])
+    plt.yticks(np.arange(-0.5, H, 1), [])
+    plt.title("GridWorld Image Representation")
+    plt.savefig("/home/oliver/Code/Blog/RL/RLbook/obs.png")
+    print("saved")
+
+
+class GridWorldImageWrapper(gym.ObservationWrapper):
+    def __init__(self, env, device: torch.device):
+        super().__init__(env)
+
+        H = env.unwrapped.desc.shape[0]
+        W = env.unwrapped.desc.shape[1]
+        self.H = H
+        self.W = W
+        self.device = device
+
+        # Precompute walls and goal
+        walls = set()
+        goal_pos = None
+        for r in range(H):
+            for c in range(W):
+                if env.unwrapped.desc[r, c] == b'H':
+                    walls.add((r, c))
+                elif env.unwrapped.desc[r, c] == b'G':
+                    goal_pos = (r, c)
+
+        self.walls = walls
+        self.goal_pos = goal_pos
+
+        self.observation_space = Box(
+            low=0.0,
+            high=1.0,
+            shape=(3, H, W),
+            dtype=np.float32,
+        )
+
+        # Create a base obs with goal and walls precomputed
+        self.base_obs = torch.zeros((3, self.H, self.W), device=device)
+        self.base_obs[1, goal_pos[0], goal_pos[1]] = 1.0
+        for (r, c) in walls:
+            self.base_obs[2, r, c] = 1.0
+
+    def gridworld_to_image(self, agent_pos, goal_pos, walls, H, W):
+        obs = self.base_obs.clone()
+
+        # Encode agent
+        obs[0, agent_pos[0], agent_pos[1]] = 1.0
+        # Encode goal
+        obs[1, goal_pos[0], goal_pos[1]] = 1.0
+        # Encode walls
+        for (r, c) in walls:
+            obs[2, r, c] = 1.0
+
+        return obs
+
+    def observation(self, state):
+        # Compute agent position from integer state
+        x = state // self.W
+        y = state % self.W
+        agent_pos = (x, y)
+
+        return self.gridworld_to_image(
+            agent_pos=agent_pos,
+            goal_pos=self.goal_pos,
+            walls=self.walls,
+            H=self.H,
+            W=self.W,
+        ),  state # TODO: only for intermeidate reward
 
 
 class GameResult(Enum):
