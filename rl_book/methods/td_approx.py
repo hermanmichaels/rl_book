@@ -257,6 +257,7 @@ class SemiGradientSarsaCNN(ApproximateTDMethod[S], Generic[S]):
         self.model = network_class(num_actions).to(device)
         self.optimizer = torch.optim.Adam(self.model.parameters(), lr=ALPHA / 10)
         self.network_class = network_class
+        self.all_actions = np.asarray([a for a in range(num_actions)])
 
     def clone(self) -> "SemiGradientSarsaCNN":
         cloned = self.__class__(
@@ -300,19 +301,14 @@ class SemiGradientSarsaCNN(ApproximateTDMethod[S], Generic[S]):
         prev_state = episode[len(episode) - 2]
         cur_state = episode[len(episode) - 1]
 
-        assert isinstance(prev_state.state, tuple)
-        assert isinstance(cur_state.state, tuple)
-
-        q_values = self.model(prev_state.state[0].unsqueeze(0))
+        q_values = self.q(prev_state.state, self.all_actions)
         q_sa = q_values[0, prev_state.action]
 
         with torch.no_grad():
             if is_final:
                 target = torch.tensor(prev_state.reward, device=self.device)
             else:
-                q_next = self.model(cur_state.state[0].unsqueeze(0))[
-                    0, cur_state.action
-                ]
+                q_next = self.q(cur_state.state, self.all_actions)[0, cur_state.action]
                 target = prev_state.reward + self.env.gamma * q_next.detach()
 
         loss = F.mse_loss(q_sa, target)
