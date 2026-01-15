@@ -18,7 +18,6 @@ class ObsMode(Enum):
 
 
 S = TypeVar("S")
-
 GAMMA = 0.97
 
 

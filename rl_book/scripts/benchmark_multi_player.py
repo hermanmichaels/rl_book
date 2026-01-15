@@ -10,9 +10,12 @@ from rl_book.methods.method import MethodWithStats
 from rl_book.methods.misc import Random
 from rl_book.methods.planning import DynaQ
 from rl_book.methods.td import DoubleQ, ExpectedSarsa, QLearning, Sarsa
-from rl_book.methods.td_approx import (CNNConnectFour, CNNTicTacToe,
-                                       SemiGradientSarsaCNN,
-                                       SemiGradientSarsaNCNN)
+from rl_book.methods.td_approx import (
+    CNNConnectFour,
+    CNNTicTacToe,
+    SemiGradientSarsaCNN,
+    SemiGradientSarsaNCNN,
+)
 from rl_book.methods.td_n import SarsaN, TreeN
 from rl_book.methods.training import train_multi_player
 

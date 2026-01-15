@@ -10,9 +10,12 @@ from rl_book.methods.mc import OffPolicyMC, OnPolicyMC
 from rl_book.methods.method import RLMethod
 from rl_book.methods.planning import DynaQ
 from rl_book.methods.td import DoubleQ, ExpectedSarsa, QLearning, Sarsa
-from rl_book.methods.td_approx import (GridWorldCNN, SemiGradientSarsaCNN,
-                                       SemiGradientSarsaLinear,
-                                       SemiGradientSarsaNCNN)
+from rl_book.methods.td_approx import (
+    GridWorldCNN,
+    SemiGradientSarsaCNN,
+    SemiGradientSarsaLinear,
+    SemiGradientSarsaNCNN,
+)
 from rl_book.methods.td_n import SarsaN, TreeN
 from rl_book.methods.training import train_single_player
 
@@ -123,7 +126,10 @@ def benchmark(
                     env, _ = generate_random_grid_world_env(
                         n, extra_rewards, eps_decay, method_.obs_mode, device
                     )
-                    if method_.__name__ in ["SemiGradientSarsaCNN", "SemiGradientSarsaNCNN"]:
+                    if method_.__name__ in [
+                        "SemiGradientSarsaCNN",
+                        "SemiGradientSarsaNCNN",
+                    ]:
                         method = method_(env, device=device, network_class=GridWorldCNN)
                     else:
                         method = method_(env, device=device)
