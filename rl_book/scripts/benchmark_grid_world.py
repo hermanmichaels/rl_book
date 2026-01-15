@@ -14,7 +14,8 @@ from rl_book.methods.method import RLMethod
 from rl_book.methods.planning import DynaQ
 from rl_book.methods.td import DoubleQ, ExpectedSarsa, QLearning, Sarsa
 from rl_book.methods.td_approx import (SemiGradientSarsaCNN,
-                                       SemiGradientSarsaLinear)
+                                       SemiGradientSarsaLinear,
+                                       SemiGradientSarsaNCNN)
 from rl_book.methods.td_n import SarsaN, TreeN
 from rl_book.methods.training import train_single_player
 
@@ -109,8 +110,8 @@ def plot_results(
 
 def benchmark(
     methods: list,
-    min_grid_size=5,
-    max_grid_size=15,
+    min_grid_size=4,
+    max_grid_size=6,
     extra_rewards: bool = True,
     eps_decay: bool = True,
     fig_path: str = "result.png",
@@ -127,6 +128,7 @@ def benchmark(
     """
     steps_needed: list[list[int]] = [[] for _ in range(len(methods))]
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    rasterized_models = ["SemiGradientSarsaCNN", "SemiGradientSarsaNCNN"]
 
     # Iterate over all possible grid sizes.
     for n in range(min_grid_size, max_grid_size):
@@ -135,9 +137,9 @@ def benchmark(
         for idx, method_ in enumerate(methods):
             obs_mode = (
                 ObsMode.RASTERIZED
-                if method_.__name__ == "SemiGradientSarsaCNN"
+                if method_.__name__ in rasterized_models
                 else ObsMode.DEFAULT
-            )  # TODO: maybe make dependent on env
+            )
             # For faster results and reduced variance (e.g. unlucky initialization)
             # try increasing maximal number of steps, and run multiple trainings
             # with each threshold - then store the best run.
@@ -148,7 +150,7 @@ def benchmark(
                     env = generate_random_env(
                         n, extra_rewards, eps_decay, obs_mode, device
                     )
-                    if method_.__name__ == "SemiGradientSarsaCNN":  # TODO
+                    if method_.__name__ in rasterized_models:
                         method = method_(env, device=device)
                     else:
                         method = method_(env)
@@ -177,10 +179,6 @@ def benchmark(
 
 
 if __name__ == "__main__":
-    benchmark(
-        [Sarsa, SemiGradientSarsaLinear, SemiGradientSarsaCNN],
-        fig_path="results/sarsa_approx.png",
-    )
     # benchmark(
     #     [OnPolicyMC, OffPolicyMC],
     #     fig_path="results/mc.png",
@@ -191,3 +189,7 @@ if __name__ == "__main__":
     #     [DynaQ],
     #     fig_path="results/planning.png",
     # )
+    benchmark(
+        [SemiGradientSarsaLinear, SemiGradientSarsaCNN, SemiGradientSarsaNCNN],
+        fig_path="results/td_approx.png",
+    )
