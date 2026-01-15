@@ -91,7 +91,7 @@ def plot_results(
     max_grid_size: int,
     fig_path: str,
 ) -> None:
-    x_values = [10, 20, 30, 40, 50] # [n for n in range(min_grid_size, max_grid_size)]
+    x_values = [10, 20, 30, 40, 50]  # [n for n in range(min_grid_size, max_grid_size)]
     markers = ["o", "s", "^", "*"]
 
     for idx, y_values in enumerate(needed_steps):
