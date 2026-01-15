@@ -1,18 +1,14 @@
-import copy
-import pickle
 import random
-from collections import defaultdict
-from typing import Any, DefaultDict
+from typing import Any
 
 import numpy as np
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
 
 from rl_book.env import ParametrizedEnv
 from rl_book.methods.method import RLMethod
 from rl_book.replay_utils import ReplayItem
-
-import torch
-import torch.nn as nn
-import torch.nn.functional as F
 
 ALPHA = 0.1
 
@@ -55,7 +51,7 @@ class SemiGradientSarsaLinear(ApproximateTDMethod):
 
     def get_name(self) -> str:
         return "Sarsa"
-    
+
     def feature_fn(self, state, action):
         x = np.zeros(self.num_states * self.num_actions)
         idx = state * self.num_actions + action
@@ -65,7 +61,7 @@ class SemiGradientSarsaLinear(ApproximateTDMethod):
     def q(self, state, action):
         """Approximate action-value."""
         return np.dot(self.w, self.feature_fn(state, action))
-    
+
     def _update(self, episode, is_final: bool):
         if len(episode) <= 1:
             return
@@ -88,7 +84,6 @@ class SemiGradientSarsaLinear(ApproximateTDMethod):
     def update(self, episode: list[ReplayItem], step: int) -> None:
         self._update(episode, False)
 
-
     def finalize(self, episode: list[ReplayItem], step: int) -> None:
         self._update(episode, True)
 
@@ -106,21 +101,24 @@ class SarsaCNN(nn.Module):
         # x: (batch, C, H, W)
         x = F.relu(self.conv1(x))
         x = F.relu(self.conv2(x))
-        x = self.pool(x)            # (batch, 32, 1, 1)
-        x = x.view(x.size(0), -1)   # flatten to (batch, 32)
-        x = self.fc(x)              # Q-values per action
+        x = self.pool(x)  # (batch, 32, 1, 1)
+        x = x.view(x.size(0), -1)  # flatten to (batch, 32)
+        x = self.fc(x)  # Q-values per action
         return x
-    
+
+
 class SemiGradientSarsaCNN(ApproximateTDMethod):
-    def __init__(self, env: ParametrizedEnv, load_weights: bool = False, device: torch.device = "cpu") -> None:
-        print(device)
+    def __init__(
+        self,
+        env: ParametrizedEnv,
+        load_weights: bool = False,
+        device: torch.device = "cpu",
+    ) -> None:
         super().__init__(env, load_weights)
 
         self.model = SarsaCNN(3, 4).to(device)
 
-        self.optimizer = torch.optim.Adam(
-            self.model.parameters(), lr=ALPHA / 100
-        )
+        self.optimizer = torch.optim.Adam(self.model.parameters(), lr=ALPHA / 100)
 
         self.device = device
 
@@ -137,7 +135,7 @@ class SemiGradientSarsaCNN(ApproximateTDMethod):
         else:
             q_values = self.model(state[0].unsqueeze(0))
             return q_values.argmax(dim=1).item()
-        
+
     def _update(self, episode, is_final: bool):
         if len(episode) <= 1:
             return
@@ -152,7 +150,9 @@ class SemiGradientSarsaCNN(ApproximateTDMethod):
             if is_final:
                 target = torch.tensor(prev_state.reward, device=self.device)
             else:
-                q_next = self.model(cur_state.state[0].unsqueeze(0))[0, cur_state.action]
+                q_next = self.model(cur_state.state[0].unsqueeze(0))[
+                    0, cur_state.action
+                ]
                 target = prev_state.reward + self.env.gamma * q_next.detach()
 
         loss = F.mse_loss(q_sa, target)
@@ -164,7 +164,5 @@ class SemiGradientSarsaCNN(ApproximateTDMethod):
     def update(self, episode: list[ReplayItem], step: int) -> None:
         self._update(episode, False)
 
-
     def finalize(self, episode: list[ReplayItem], step: int) -> None:
         self._update(episode, True)
-
