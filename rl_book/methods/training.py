@@ -54,6 +54,12 @@ def train_single_player(
 
         if callback and callback(method, step):
             return True, step
+        
+        # if len(episode) == 6:
+        #     import ipdb
+        #     ipdb.set_trace()
+
+        # print("#########################################################")
 
     env.env.close()
 

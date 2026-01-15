@@ -30,12 +30,10 @@ class SarsaN(TDMethod):
     def _update(
         self, episode: list[ReplayItem[int]], tau: int | None = None
     ) -> None:
-        is_final = True
         if tau is None:
             # tau is set when finalizing the episode - otherwise pick
             # the correct update step here.
             tau = len(episode) - self.n - 1
-            is_final = False
 
         if tau >= 0:
             end_index = len(episode)
@@ -46,7 +44,7 @@ class SarsaN(TDMethod):
                 ]
             )
 
-            if not is_final:
+            if tau + self.n < len(episode):
                 G = (
                     G
                     + self.env.gamma**self.n
@@ -56,9 +54,7 @@ class SarsaN(TDMethod):
                     ]
                 )
 
-            self.Q[episode[tau].state, episode[tau].action] = self.Q[
-                episode[tau].state, episode[tau].action
-            ] + ALPHA * (G - self.Q[episode[tau].state, episode[tau].action])
+            self.Q[episode[tau].state, episode[tau].action] += ALPHA * (G - self.Q[episode[tau].state, episode[tau].action])
 
     @override
     def update(
@@ -70,7 +66,8 @@ class SarsaN(TDMethod):
     def finalize(self, episode: list[ReplayItem[int]], step: int) -> None:
         # Replay has terminated - still finish updating the values
         # by going over the remaining episode.
-        for tau in range(len(episode) - self.n - 1, len(episode)):
+        
+        for tau in range(len(episode) - self.n, len(episode)):
             self._update(episode, tau)
 
    
@@ -88,28 +85,20 @@ class TreeN(TDMethod):
         self.Q = defaultdict(ConstantFactory(0.1))
         self.n = n
 
+    @override
     def get_name(self) -> str:
         return "TreeN"
 
-    def finalize(self, episode: list[ReplayItem[int]], step: int) -> None:
-        for tau in range(len(episode) - self.n - 1, len(episode)):
-            self.update(episode, step, tau)
-
-    def _get_action_prob(self, observation: int, action: int) -> float:
-        probs = [self.Q[observation, a] for a in range(self.env.get_action_space_len())]
-        probs = np.exp(probs - np.max(probs))
-        return probs[action] / sum(probs)
-
-    def update(
-        self, replay_buffer: list[ReplayItem[int]], step: int, tau: int | None = None
+    def _update(
+        self, replay_buffer: list[ReplayItem[int]], tau: int | None = None
     ):
-        is_final = True
         if tau is None:
             tau = len(replay_buffer) - self.n - 1
-            is_final = False
 
         if tau >= 0:
-            if is_final:
+            if tau >= len(replay_buffer) - 1:
+                # assert False
+                print("A")
                 G = replay_buffer[-1].reward
             else:
                 allowed_actions = self.get_allowed_actions(replay_buffer[-1].mask)
@@ -141,8 +130,25 @@ class TreeN(TDMethod):
                     * G
                 )
 
-            self.Q[replay_buffer[tau].state, replay_buffer[tau].action] = self.Q[
-                replay_buffer[tau].state, replay_buffer[tau].action
-            ] + ALPHA * (
+            self.Q[replay_buffer[tau].state, replay_buffer[tau].action] += ALPHA * (
                 G - self.Q[replay_buffer[tau].state, replay_buffer[tau].action]
             )
+
+    @override
+    def update(
+        self, replay_buffer: list[ReplayItem[int]], step: int, tau: int | None = None
+    ):
+        self._update(replay_buffer, None)
+        
+
+    @override
+    def finalize(self, episode: list[ReplayItem[int]], step: int) -> None:
+        for tau in range(len(episode) - self.n, len(episode)):
+            self._update(episode, tau)
+
+    def _get_action_prob(self, observation: int, action: int) -> float:
+        probs = [self.Q[observation, a] for a in range(self.env.get_action_space_len())]
+        probs = np.exp(probs - np.max(probs))
+        return probs[action] / sum(probs)
+
+
