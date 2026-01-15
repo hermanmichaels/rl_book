@@ -20,14 +20,14 @@ class SarsaN(TDMethod):
     def get_name(self) -> str:
         return "SarsaN"
 
-    def finalize(self, episode: list[ReplayItem], step: int) -> None:
+    def finalize(self, episode: list[ReplayItem[int]], step: int) -> None:
         # Replay has terminated - still finish updating the values
         # by going over the remaining episode.
         for tau in range(len(episode) - self.n - 1, len(episode)):
             self.update(episode, step, tau)
 
     def update(
-        self, episode: list[ReplayItem], step: int, tau: int | None = None
+        self, episode: list[ReplayItem[int]], step: int, tau: int | None = None
     ) -> None:
         is_final = True
         if tau is None:
@@ -68,7 +68,7 @@ class TreeN(TDMethod):
     def get_name(self) -> str:
         return "TreeN"
 
-    def finalize(self, episode: list[ReplayItem], step: int) -> None:
+    def finalize(self, episode: list[ReplayItem[int]], step: int) -> None:
         for tau in range(len(episode) - self.n - 1, len(episode)):
             self.update(episode, step, tau)
 
@@ -78,7 +78,7 @@ class TreeN(TDMethod):
         return probs[action] / sum(probs)
 
     def update(
-        self, replay_buffer: list[ReplayItem], step: int, tau: int | None = None
+        self, replay_buffer: list[ReplayItem[int]], step: int, tau: int | None = None
     ):
         is_final = True
         if tau is None:

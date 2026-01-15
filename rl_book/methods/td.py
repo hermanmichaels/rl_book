@@ -48,7 +48,7 @@ class Sarsa(TDMethod):
     def get_name(self) -> str:
         return "Sarsa"
 
-    def update(self, episode: list[ReplayItem], step: int) -> None:
+    def update(self, episode: list[ReplayItem[int]], step: int) -> None:
         if len(episode) <= 1:
             return
 
@@ -63,7 +63,7 @@ class Sarsa(TDMethod):
             - self.Q[prev_state.state, prev_state.action]
         )
 
-    def finalize(self, episode: list[ReplayItem], step: int) -> None:
+    def finalize(self, episode: list[ReplayItem[int]], step: int) -> None:
         self.update(episode, step)
 
 
@@ -71,7 +71,7 @@ class QLearning(TDMethod):
     def get_name(self) -> str:
         return "QLearning"
 
-    def update(self, episode: list[ReplayItem], step: int) -> None:
+    def update(self, episode: list[ReplayItem[int]], step: int) -> None:
         if len(episode) <= 1:
             return
 
@@ -92,7 +92,7 @@ class QLearning(TDMethod):
             - self.Q[cur_state.state, cur_state.action]
         )
 
-    def finalize(self, episode: list[ReplayItem], step: int) -> None:
+    def finalize(self, episode: list[ReplayItem[int]], step: int) -> None:
         self.update(episode, step)
 
 
@@ -105,7 +105,7 @@ class ExpectedSarsa(TDMethod):
         probs = np.exp(probs - np.max(probs))
         return probs[action] / sum(probs)
 
-    def update(self, episode: list[ReplayItem], step: int) -> None:
+    def update(self, episode: list[ReplayItem[int]], step: int) -> None:
         if len(episode) <= 1:
             return
 
@@ -128,7 +128,7 @@ class ExpectedSarsa(TDMethod):
 
         self.Q[cur_state.state, cur_state.action] = updated_q_value
 
-    def finalize(self, episode: list[ReplayItem], step: int) -> None:
+    def finalize(self, episode: list[ReplayItem[int]], step: int) -> None:
         self.update(episode, step)
 
 
@@ -140,7 +140,7 @@ class DoubleQ(TDMethod):
         super().__init__(env, load_weights)
         self.Q_2: DefaultDict[tuple[int, int], float] = defaultdict(float)
 
-    def update(self, episode: list[ReplayItem], step: int) -> None:
+    def update(self, episode: list[ReplayItem[int]], step: int) -> None:
         if len(episode) <= 1:
             return
 
@@ -176,7 +176,7 @@ class DoubleQ(TDMethod):
                 - self.Q_2[cur_state.state, cur_state.action]
             )
 
-    def finalize(self, episode: list[ReplayItem], step: int) -> None:
+    def finalize(self, episode: list[ReplayItem[int]], step: int) -> None:
         self.update(episode, step)
 
     def _get_save_data(self) -> Any:

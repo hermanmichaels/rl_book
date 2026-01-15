@@ -33,7 +33,7 @@ def model_factory():
     return 0, 0.0, 0
 
 
-class DynaQ(RLMethod):
+class DynaQ(RLMethod[int]):
     def __init__(
         self,
         env: ParametrizedEnv,
@@ -68,7 +68,7 @@ class DynaQ(RLMethod):
             max_actions = [a for a, q in zip(allowed_actions, q_values) if q == max_q]
             return random.choice(max_actions)
 
-    def update(self, episode: list[ReplayItem], step: int) -> None:
+    def update(self, episode: list[ReplayItem[int]], step: int) -> None:
         if len(episode) <= 1:
             return
 
@@ -126,7 +126,7 @@ class DynaQ(RLMethod):
         with open(save_path, "rb") as f:
             self.Q, self.model = pickle.load(f)
 
-    def finalize(self, episode: list[ReplayItem], step: int) -> None:
+    def finalize(self, episode: list[ReplayItem[int]], step: int) -> None:
         self.update(episode, step)
 
 
