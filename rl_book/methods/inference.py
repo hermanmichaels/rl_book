@@ -22,9 +22,6 @@ def test_single_player(env: Env, method: RLMethod) -> None:
 def test_against_user(env: MultiPlayerEnv, method: RLMethod) -> None:
     env.env.reset()
 
-    # print("XXXX")
-    # method._avg()
-
     for agent in env.env.agent_iter():  # type: ignore
         (
             observation,

@@ -271,7 +271,7 @@ class SemiGradientSarsaCNN(ApproximateTDMethod[S], Generic[S, T]):
             self.model.load_state_dict(state_dict)
 
 
-class SemiGradientSarsaNCNN(ApproximateTDMethod[S], Generic[S]):
+class SemiGradientSarsaNCNN(ApproximateTDMethod[S], Generic[S, T]):
     obs_mode: ClassVar[ObsMode] = ObsMode.RASTERIZED
 
     def __init__(

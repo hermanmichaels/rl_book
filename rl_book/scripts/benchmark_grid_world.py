@@ -78,7 +78,7 @@ def plot_results(
             label=methods[idx].__name__,
         )
         plt.legend()
-        # plt.xticks([10, 20, 30, 40, 50])
+        plt.xticks([5, 10, 15, 20, 25])
         plt.xlabel("Gridworld size")
         plt.ylabel("Steps needed")
 
@@ -89,7 +89,7 @@ def plot_results(
 def benchmark(
     methods: list[type[RLMethod]],
     min_grid_size=5,
-    max_grid_size=7,
+    max_grid_size=26,
     extra_rewards: bool = True,
     eps_decay: bool = True,
     fig_path: str = "result.png",
@@ -107,7 +107,7 @@ def benchmark(
     steps_needed: list[list[int]] = [[] for _ in range(len(methods))]
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-    ns = [5, 15, 25]  # range(min_grid_size, max_grid_size)
+    ns = range(min_grid_size, max_grid_size)
 
     # Iterate over all possible grid sizes.
     for n in ns:
@@ -156,16 +156,16 @@ def benchmark(
 
 
 if __name__ == "__main__":
-    benchmark(
-        [OnPolicyMC, OffPolicyMC],
-        fig_path="results/mc.png",
-    )
-    benchmark([Sarsa, QLearning, ExpectedSarsa, DoubleQ], fig_path="results/td.png")
-    benchmark([SarsaN, TreeN], fig_path="results/td_n.png")
-    benchmark(
-        [DynaQ],
-        fig_path="results/planning.png",
-    )
+    # benchmark(
+    #     [OnPolicyMC, OffPolicyMC],
+    #     fig_path="results/mc.png",
+    # )
+    # benchmark([Sarsa, QLearning, ExpectedSarsa, DoubleQ], fig_path="results/td.png")
+    # benchmark([SarsaN, TreeN], fig_path="results/td_n.png")
+    # benchmark(
+    #     [DynaQ],
+    #     fig_path="results/planning.png",
+    # )
     benchmark(
         [
             SemiGradientSarsaLinear[tuple[torch.Tensor, int]],
