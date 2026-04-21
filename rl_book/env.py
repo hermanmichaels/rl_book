@@ -1,12 +1,86 @@
 from enum import Enum
-from typing import Any
+from typing import Any, Generic, Literal, TypeVar, cast, overload
 
+import gymnasium as gym
 import numpy as np
-from gymnasium.core import Env  # TODO: or any other env
-from gymnasium.spaces import Discrete
+import torch
+from gymnasium.core import Env
+from gymnasium.envs.toy_text.frozen_lake import generate_random_map
+from gymnasium.spaces import Box, Discrete
 
 
-class ParametrizedEnv:
+# Toggle different observation "modes", such as
+# "default" (int values) and rasterized images.
+class ObsMode(Enum):
+    INVALID = 0
+    DEFAULT = 1
+    RASTERIZED = 2
+
+
+S = TypeVar("S")
+GAMMA = 0.97
+
+
+@overload
+def generate_random_grid_world_env(
+    n: int,
+    extra_rewards: bool,
+    eps_decay: bool,
+    obs_mode: Literal[ObsMode.DEFAULT],
+    device: torch.device = torch.device("cpu"),
+) -> tuple["GridWorldEnv[int]", list[str]]:
+    ...
+
+
+@overload
+def generate_random_grid_world_env(
+    n: int,
+    extra_rewards: bool,
+    eps_decay: bool,
+    obs_mode: Literal[ObsMode.RASTERIZED],
+    device: torch.device = torch.device("cpu"),
+) -> tuple["GridWorldEnv[tuple[torch.Tensor, int]]", list[str]]:
+    ...
+
+
+@overload
+def generate_random_grid_world_env(
+    n: int,
+    extra_rewards: bool,
+    eps_decay: bool,
+    obs_mode: ObsMode,
+    device: torch.device = torch.device("cpu"),
+) -> tuple["GridWorldEnv[int] | GridWorldEnv[tuple[torch.Tensor, int]]", list[str],]:
+    ...
+
+
+def generate_random_grid_world_env(
+    n: int,
+    extra_rewards: bool,
+    eps_decay: bool,
+    obs_mode: ObsMode,
+    device: torch.device = torch.device("cpu"),
+) -> tuple["GridWorldEnv", list[str]]:
+    desc = generate_random_map(size=n)
+    gym_env = gym.make(
+        "FrozenLake-v1",
+        desc=desc,
+        is_slippery=False,
+    )
+    return (
+        GridWorldEnv(
+            gym_env,
+            GAMMA,
+            intermediate_rewards=extra_rewards,
+            eps_decay=eps_decay,
+            obs_mode=obs_mode,
+            device=device,
+        ),
+        desc,
+    )
+
+
+class ParametrizedEnv(Generic[S]):
     """Custom wrapper around Gymnasium (or other) envs."""
 
     def __init__(self, env: Env, gamma: float, eps_decay: bool) -> None:
@@ -14,7 +88,7 @@ class ParametrizedEnv:
         self.gamma = gamma
         self.eps_end: float = 0.05
         self.eps_start: float = 0.9  # TOOD: 1 crashes with MC
-        self.num_decay_steps: int = 1000
+        self.num_decay_steps: int = 10000
         self.eps_decay = eps_decay
 
     def eps(self, step: int) -> float:
@@ -37,10 +111,7 @@ class ParametrizedEnv:
             )
         )
 
-    def obs_to_state(self, obs: Any, start_pos: int = 0) -> int:
-        return obs
-
-    def step(self, action: int, old_obs: int) -> tuple[int, float, bool, bool, dict]:
+    def step(self, action: int, old_obs: S) -> tuple[S, float, bool, bool, dict]:
         raise NotImplementedError
 
     def get_action_space_len(self) -> int:
@@ -53,27 +124,37 @@ class ParametrizedEnv:
         raise NotImplementedError
 
 
-class GridWorldEnv(ParametrizedEnv):
+class GridWorldEnv(ParametrizedEnv[S], Generic[S]):
     """Env wrapper for "Grid world"."""
 
     def __init__(
-        self, env: Env, gamma: float, eps_decay: bool, intermediate_rewards: bool
+        self,
+        env: Env,
+        gamma: float,
+        eps_decay: bool,
+        intermediate_rewards: bool,
+        obs_mode: ObsMode,
+        device: torch.device,
     ) -> None:
-        super().__init__(env, gamma, eps_decay)
+        if obs_mode == ObsMode.RASTERIZED:
+            super().__init__(GridWorldImageWrapper(env, device), gamma, eps_decay)
+        else:
+            super().__init__(env, gamma, eps_decay)
 
         self.intermediate_rewards = intermediate_rewards
+        self.grid_size = env.unwrapped.desc.shape[0]  # type: ignore[attr-defined]
+        self.obs_mode = obs_mode
 
     def normalized_grid_position_sum(self, observation: int) -> float:
         """Computes the normalized row / column index of the passed observation.
         Used for reward heuristics under the assumption that a higher such
         value is better / closer to the goal.
         """
-        assert isinstance(self.env.observation_space, Discrete)
-        observation_space: Discrete = self.env.observation_space
-        grid_size = np.sqrt(observation_space.n)
-        return (observation // grid_size + observation % grid_size) / grid_size
+        return (
+            observation // self.grid_size + observation % self.grid_size
+        ) / self.grid_size
 
-    def step(self, action: int, old_obs: int) -> tuple[int, float, bool, bool, dict]:
+    def step(self, action: int, old_obs: S) -> tuple[S, float, bool, bool, dict]:
         """Executes a step in the environment and, among others, returns new observation
         and observed reward.
         When "intermediate_rewards" is set, augment the reward by a progress heuristic,
@@ -92,23 +173,90 @@ class GridWorldEnv(ParametrizedEnv):
         """
         observation, reward, terminated, truncated, info = self.env.step(action)
         reward = float(reward)
+
         if self.intermediate_rewards:
+            if self.obs_mode == ObsMode.RASTERIZED:
+                assert isinstance(old_obs, tuple)
+                _, obs_for_intermediate = observation
+                _, old_obs_for_intermediate = old_obs
+            else:
+                assert isinstance(old_obs, int)
+                obs_for_intermediate = observation
+                old_obs_for_intermediate = old_obs
+
             reward += self.normalized_grid_position_sum(
-                observation
-            ) - self.normalized_grid_position_sum(old_obs)
+                obs_for_intermediate
+            ) - self.normalized_grid_position_sum(old_obs_for_intermediate)
         return observation, reward, terminated, truncated, info
 
     def get_action_space_len(self) -> int:
         assert isinstance(self.env.action_space, Discrete)
-        return int(self.env.action_space.n)
+        return cast(int, self.env.action_space.n)
 
     def get_observation_space_len(self) -> int:
         assert isinstance(self.env.observation_space, Discrete)
-        return int(self.env.observation_space.n)
+        return cast(int, self.env.observation_space.n)
 
     def get_max_num_steps(self) -> int:
-        assert isinstance(self.env.observation_space, Discrete)
-        return int(self.env.observation_space.n) * 4
+        return self.grid_size**2 * 4
+
+
+class GridWorldImageWrapper(gym.ObservationWrapper):
+    """Wrapper around GridWorldEnv to provide rasterized images as observations."""
+
+    def __init__(self, env: Env, device: torch.device):
+        super().__init__(env)
+
+        self.H = env.unwrapped.desc.shape[0]  # type: ignore[attr-defined]
+        self.W = env.unwrapped.desc.shape[1]  # type: ignore[attr-defined]
+        self.device = device
+
+        # Precompute walls and goal
+        walls = set()
+        goal_pos = None
+        for r in range(self.H):
+            for c in range(self.W):
+                if env.unwrapped.desc[r, c] == b"H":  # type: ignore[attr-defined]
+                    walls.add((r, c))
+                elif env.unwrapped.desc[r, c] == b"G":  # type: ignore[attr-defined]
+                    goal_pos = (r, c)
+        assert goal_pos is not None, "No goal found, this should not happen"
+
+        self.observation_space = Box(
+            low=0.0,
+            high=1.0,
+            shape=(3, self.H, self.W),
+            dtype=np.float32,
+        )
+
+        # Create a base obs with goal and walls precomputed,
+        # since this information is static
+        self.base_obs = torch.zeros((3, self.H, self.W), device=device)
+        self.base_obs[1, goal_pos[0], goal_pos[1]] = 1.0
+        for (r, c) in walls:
+            self.base_obs[2, r, c] = 1.0
+
+    def observation(self, state: int) -> tuple[torch.Tensor, int]:
+        """Computes the rasterized image observation.
+
+        Args:
+            state: original env state
+
+        Returns:
+            - rasterized state
+            - as well as original int state (for intermediate rewards)
+        """
+        # Compute agent position from integer state
+        x = state // self.W
+        y = state % self.W
+
+        obs = self.base_obs.clone()
+        obs[0, x, y] = 1.0
+
+        return (
+            obs,
+            state,
+        )
 
 
 class GameResult(Enum):
@@ -118,15 +266,18 @@ class GameResult(Enum):
     LOSS = 3
 
 
-class MultiPlayerEnv(ParametrizedEnv):
+class MultiPlayerEnv(ParametrizedEnv[S], Generic[S]):
     """Wrapper around multi-player game envs.
     Atm only 2-player games are supported."""
 
-    def __init__(self, env: Env, gamma: float, players: list[str]) -> None:
+    def __init__(
+        self, env: Env, gamma: float, players: list[str], device=torch.device("cpu")
+    ) -> None:
         super().__init__(env, gamma, True)
         if not len(players) == 2:
             raise ValueError(f"Expected two players, but got {players}")
         self.players = players
+        self.device = device
 
     def get_action_space_len(self) -> int:
         return self.env.action_space(self.players[0]).n  # type: ignore
@@ -134,7 +285,9 @@ class MultiPlayerEnv(ParametrizedEnv):
     def get_observation_space_len(self) -> int:
         raise NotImplementedError
 
-    def obs_to_state(self, obs: Any, player_pos: int = 0) -> int:
+    def obs_to_state(
+        self, obs: Any, player_pos: int = 0, obs_mode: ObsMode = ObsMode.DEFAULT
+    ) -> S:
         raise NotImplementedError
 
     def get_game_result(self, reward) -> GameResult:
@@ -145,32 +298,40 @@ class MultiPlayerEnv(ParametrizedEnv):
         raise NotImplementedError
 
 
-class TicTacToeEnv(MultiPlayerEnv):
+class TicTacToeEnv(MultiPlayerEnv[int | torch.Tensor]):
     """TicTacToe env."""
 
-    def __init__(self, env: Env, gamma=0.95):
-        super().__init__(env, gamma, ["player_1", "player_2"])
+    def __init__(self, env: Env, gamma=0.95, device=torch.device("cpu")):
+        super().__init__(env, gamma, ["player_1", "player_2"], device)
 
-    def obs_to_state(self, obs: Any, start_pos: int = 0) -> int:
-        board = obs  # shape: (3, 3, 2)
-        state_flat = []
+    def obs_to_state(
+        self, obs: Any, start_pos: int = 0, obs_mode: ObsMode = ObsMode.DEFAULT
+    ) -> int | torch.Tensor:
+        if obs_mode == ObsMode.DEFAULT:
+            board = obs  # shape: (3, 3, 2)
+            state_flat = []
 
-        for row in range(3):
-            for col in range(3):
-                if board[row][col][0] == 1:
-                    state_flat.append(1)  # player 1
-                elif board[row][col][1] == 1:
-                    state_flat.append(2)  # player 2
-                else:
-                    state_flat.append(0)  # empty
+            for row in range(3):
+                for col in range(3):
+                    if board[row][col][0] == 1:
+                        state_flat.append(1)  # player 1
+                    elif board[row][col][1] == 1:
+                        state_flat.append(2)  # player 2
+                    else:
+                        state_flat.append(0)  # empty
 
-        state_flat.append(start_pos)
+            # Convert base-3 list to integer
+            state = 0
+            for i, val in enumerate(state_flat):
+                state += val * (3**i)
 
-        # Convert base-3 list to integer
-        state = 0
-        for i, val in enumerate(state_flat):
-            state += val * (3**i)
-        return state
+            return state
+        elif obs_mode == ObsMode.RASTERIZED:
+            return torch.as_tensor(
+                np.transpose(obs, [2, 1, 0]), device=self.device
+            ).float()
+        else:
+            raise ValueError(f"Got unexpected obs_mode {obs_mode}")
 
     def get_game_result(self, reward: float) -> GameResult:
         if reward == 1:
@@ -192,33 +353,47 @@ class TicTacToeEnv(MultiPlayerEnv):
         2 | 5 | 8"
 
 
-class ConnectFourEnv(MultiPlayerEnv):
+
+class ConnectFourEnv(MultiPlayerEnv[int | torch.Tensor]):
     """ConnectFour env."""
 
-    def __init__(self, env: Env, gamma=0.95) -> None:
-        super().__init__(env, gamma, ["player_0", "player_1"])
+    def __init__(self, env: Env, gamma=0.95, device=torch.device("cpu")) -> None:
+        super().__init__(env, gamma, ["player_0", "player_1"], device)
+        self.c = 0
 
-    def obs_to_state(self, obs: Any, start_pos: int = 0) -> int:
-        board = obs  # shape: (6, 7, 2)
-        state_flat = []
+    def obs_to_state(
+        self, obs: Any, start_pos: int = 0, obs_mode: ObsMode = ObsMode.DEFAULT
+    ) -> int | torch.Tensor:
 
-        for row in range(6):
-            for col in range(7):
-                if board[row][col][0] == 1:
-                    state_flat.append(1)  # player 1
-                elif board[row][col][1] == 1:
-                    state_flat.append(2)  # player 2
-                else:
-                    state_flat.append(0)  # empty
+        if obs_mode == ObsMode.DEFAULT:
+            board = obs  # shape: (6, 7, 2)
 
-        state_flat.append(start_pos)
+            state_flat = []
 
-        # Convert to base-3 integer
-        state_encoded = 0
-        for i, val in enumerate(state_flat):
-            state_encoded += val * (3**i)
+            for row in range(6):
+                for col in range(7):
+                    if board[row][col][0] == 1:
+                        state_flat.append(1)  # player 1
+                    elif board[row][col][1] == 1:
+                        state_flat.append(2)  # player 2
+                    else:
+                        state_flat.append(0)  # empty
 
-        return state_encoded
+            state_flat.append(start_pos)  # TODO: remove!
+
+            # Convert to base-3 integer
+            state_encoded = 0
+            for i, val in enumerate(state_flat):
+                state_encoded += val * (3**i)
+
+            return state_encoded
+        elif obs_mode == ObsMode.RASTERIZED:
+            self.c += 1
+            res = torch.as_tensor(
+                np.transpose(obs, [2, 1, 0]), device=self.device
+            ).float()
+            return res
+        raise ValueError(f"Got unexpected obs_mode {obs_mode}")
 
     def get_game_result(self, reward: float) -> GameResult:
         if reward == 1:

@@ -51,7 +51,6 @@ def train_single_player(
             if cur_episode_len > env.get_max_num_steps():
                 break
 
-        episode.append(ReplayItem(observation_new, -1, reward, []))
         method.finalize(episode, step)
 
         if callback and callback(method, step):
@@ -80,7 +79,7 @@ def train_multi_player(
         max_steps: maixmal number of update steps
     """
     # For plotting: keep (step, win_ratio) tuples for every method at different steps.
-    win_ratios: list[list[tuple[int, float]]] = [[] for method in methods]
+    win_ratios: list[list[tuple[int, float]]] = [[] for _ in methods]
 
     for step in range(max_steps):
         env.env.reset()
@@ -127,41 +126,31 @@ def train_multi_player(
                 )
             else:
                 mask = observation["action_mask"]
-                state = env.obs_to_state(observation["observation"], player_pos)
-                if agent == env.players[player_pos]:
-                    action = methods[method_idx].method.act(state, step, mask)
-                else:
-                    action = opponent.method.act(state, step, mask)
+                cur_method = (
+                    methods[method_idx]
+                    if agent == env.players[player_pos]
+                    else opponent
+                )
+                state = env.obs_to_state(
+                    observation["observation"],
+                    player_pos,
+                    obs_mode=cur_method.method.obs_mode,
+                )
+                action = cur_method.method.act(state, step, mask)
                 state_dict[agent] = (state, action, mask)
 
             env.env.step(action)
 
             _, reward, _, _, _ = env.env.last()  # type: ignore
-
             if (
                 env.env.agent_selection == env.players[player_pos]  # type: ignore
                 and env.env.agent_selection in state_dict  # type: ignore
             ):
                 s, a, mask = state_dict[env.players[player_pos]]
 
-                observation_new = env.env.observe(  # type: ignore
-                    env.players[player_pos]
-                )
-
-                episode.append(ReplayItem(s, a, reward, mask))
+                episode.append(ReplayItem(s, a, float(reward), mask))
 
                 methods[method_idx].method.update(episode, step)
-
-        episode.append(
-            ReplayItem(
-                env.obs_to_state(
-                    observation_new["observation"], player_pos
-                ),  # type: ignore
-                -1,
-                0,
-                [],
-            )
-        )
 
         methods[method_idx].method.finalize(episode, step)
 

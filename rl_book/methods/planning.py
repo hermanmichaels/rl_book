@@ -5,6 +5,7 @@ from collections import defaultdict
 from typing import Any, DefaultDict, Optional
 
 import numpy as np
+from typing_extensions import override
 
 from rl_book.env import ParametrizedEnv
 from rl_book.methods.method import RLMethod
@@ -30,18 +31,18 @@ class ReplayBuffer:
 
 
 def model_factory():
-    return 0, 0.0, 0
+    return 0, 0.0, 0, []
 
 
-class DynaQ(RLMethod):
+class DynaQ(RLMethod[int]):
     def __init__(
         self,
         env: ParametrizedEnv,
         load_weights: bool = False,
         n: int = 3,
         plus_mode: bool = False,
+        **kwargs: object
     ):
-        super().__init__(env, load_weights)
         self.Q: DefaultDict[tuple[int, int], float] = defaultdict(float)
         self.n = n
         self.buffer = ReplayBuffer()
@@ -50,17 +51,26 @@ class DynaQ(RLMethod):
         ] = defaultdict(model_factory)
         self.plus_mode = plus_mode
 
+        super().__init__(env, load_weights, **kwargs)
+
+    @override
     def get_name(self) -> str:
         return "DynaQ"
 
+    @override
     def clone(self):
         cloned = self.__class__(self.env, False, self.n, self.plus_mode)
         cloned.Q = copy.deepcopy(self.Q)
         return cloned
 
+    @override
     def act(self, state: int, step: int | None = None, mask: np.ndarray | list = []):
         allowed_actions = self.get_allowed_actions(mask)
-        if self._train and step and random.uniform(0, 1) < self.env.eps(step):
+        if (
+            self._train
+            and step is not None
+            and random.uniform(0, 1) < self.env.eps(step)
+        ):
             return random.choice(allowed_actions)
         else:
             q_values = [self.Q[state, a] for a in allowed_actions]
@@ -68,37 +78,8 @@ class DynaQ(RLMethod):
             max_actions = [a for a, q in zip(allowed_actions, q_values) if q == max_q]
             return random.choice(max_actions)
 
-    def update(self, episode: list[ReplayItem], step: int) -> None:
-        if len(episode) <= 1:
-            return
-
-        self.buffer.push(episode[-2].state, episode[-2].action)
-
+    def _learn(self, step: int) -> None:
         kappa = 0.1
-
-        cur_state = episode[len(episode) - 2]
-        next_state = episode[len(episode) - 1]
-
-        allowed_actions = self.get_allowed_actions(cur_state.mask)
-        next_q = max(
-            [self.Q[next_state.state, a_] for a_ in allowed_actions],
-            default=0,
-        )
-
-        self.Q[cur_state.state, cur_state.action] = self.Q[
-            cur_state.state, cur_state.action
-        ] + ALPHA * (
-            cur_state.reward
-            + self.env.gamma * next_q
-            - self.Q[cur_state.state, cur_state.action]
-        )
-
-        self.model[cur_state.state, cur_state.action] = (
-            next_state.state,
-            cur_state.reward,
-            step,
-            next_state.mask,
-        )
 
         for _ in range(self.n):
             observation, action = self.buffer.sample()
@@ -119,15 +100,59 @@ class DynaQ(RLMethod):
                 - self.Q[observation, action]
             )
 
+    @override
+    def update(
+        self, episode: list[ReplayItem[int]], step: int
+    ) -> None:  # TODO: signtuare
+        if len(episode) <= 2:
+            return
+
+        self.buffer.push(episode[-2].state, episode[-2].action)
+
+        cur_state = episode[len(episode) - 2]
+        next_state = episode[len(episode) - 1]
+
+        allowed_actions = self.get_allowed_actions(next_state.mask)
+        next_q = max(
+            [self.Q[next_state.state, a_] for a_ in allowed_actions],
+            default=0,
+        )
+
+        self.Q[cur_state.state, cur_state.action] = self.Q[
+            cur_state.state, cur_state.action
+        ] + ALPHA * (
+            cur_state.reward
+            + self.env.gamma * next_q
+            - self.Q[cur_state.state, cur_state.action]
+        )
+
+        self.model[cur_state.state, cur_state.action] = (
+            next_state.state,
+            cur_state.reward,
+            step,
+            next_state.mask,
+        )
+
+        self._learn(step)
+
+    def finalize(self, episode: list[ReplayItem[int]], step: int) -> None:
+        if len(episode) <= 1:
+            return
+
+        cur_state = episode[len(episode) - 1]
+
+        self.Q[cur_state.state, cur_state.action] += ALPHA * (
+            cur_state.reward - self.Q[cur_state.state, cur_state.action]
+        )
+
+        self._learn(step)
+
     def _get_save_data(self) -> Any:
         return self.Q, self.model
 
     def _load_weights(self, save_path: str) -> None:
         with open(save_path, "rb") as f:
             self.Q, self.model = pickle.load(f)
-
-    def finalize(self, episode: list[ReplayItem], step: int) -> None:
-        self.update(episode, step)
 
 
 class TreeNode:

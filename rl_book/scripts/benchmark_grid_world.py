@@ -1,36 +1,25 @@
 import time
 from functools import partial
-from typing import Callable
 
-import gymnasium as gym
 import matplotlib.pyplot as plt
+import torch
 from gymnasium.core import Env
-from gymnasium.envs.toy_text.frozen_lake import generate_random_map
 
-from rl_book.env import GridWorldEnv
+from rl_book.env import generate_random_grid_world_env
 from rl_book.methods.mc import OffPolicyMC, OnPolicyMC
 from rl_book.methods.method import RLMethod
+from rl_book.methods.models import GridWorldCNN
 from rl_book.methods.planning import DynaQ
 from rl_book.methods.td import DoubleQ, ExpectedSarsa, QLearning, Sarsa
+from rl_book.methods.td_approx import (SemiGradientSarsaCNN,
+                                       SemiGradientSarsaLinear,
+                                       SemiGradientSarsaNCNN)
 from rl_book.methods.td_n import SarsaN, TreeN
 from rl_book.methods.training import train_single_player
 
-GAMMA = 0.97
 MAX_INFERENCE_STEPS = 1000
 MAX_STEPS = [10000, 30000, 100000, 200000]
 TRIES_PER_STEP = 3
-
-
-def generate_random_env(n: int, extra_rewards: bool, eps_decay: bool) -> GridWorldEnv:
-    desc = generate_random_map(size=n)
-    gym_env = gym.make(
-        "FrozenLake-v1",
-        desc=desc,
-        is_slippery=False,
-    )
-    return GridWorldEnv(
-        gym_env, GAMMA, intermediate_rewards=extra_rewards, eps_decay=eps_decay
-    )
 
 
 def get_check_frequency(step: int) -> int:
@@ -75,12 +64,10 @@ def success_callback(method: RLMethod, step: int, env: Env) -> bool:
 
 def plot_results(
     needed_steps: list[list[int]],
-    methods: list[Callable],
-    min_grid_size: int,
-    max_grid_size: int,
+    methods: list[type[RLMethod]],
+    x_values: list[int],
     fig_path: str,
 ) -> None:
-    x_values = [n for n in range(min_grid_size, max_grid_size)]
     markers = ["o", "s", "^", "*"]
 
     for idx, y_values in enumerate(needed_steps):
@@ -93,14 +80,15 @@ def plot_results(
         plt.legend()
         plt.xlabel("Gridworld size")
         plt.ylabel("Steps needed")
-        plt.savefig(fig_path)
+
+    plt.savefig(fig_path)
     plt.clf()
 
 
 def benchmark(
-    methods: list,
+    methods: list[type[RLMethod]],
     min_grid_size=5,
-    max_grid_size=20,
+    max_grid_size=26,
     extra_rewards: bool = True,
     eps_decay: bool = True,
     fig_path: str = "result.png",
@@ -116,9 +104,12 @@ def benchmark(
         fig_path: path to which to save the figure to
     """
     steps_needed: list[list[int]] = [[] for _ in range(len(methods))]
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+    ns = range(min_grid_size, max_grid_size)
 
     # Iterate over all possible grid sizes.
-    for n in range(min_grid_size, max_grid_size):
+    for n in ns:
         start = time.time()
         # Iterate over all methods.
         for idx, method_ in enumerate(methods):
@@ -129,8 +120,16 @@ def benchmark(
             for max_steps in MAX_STEPS:
                 steps_needed_cur: list[int] = []
                 for _ in range(TRIES_PER_STEP):
-                    env = generate_random_env(n, extra_rewards, eps_decay)
-                    method = method_(env)
+                    env, _ = generate_random_grid_world_env(
+                        n, extra_rewards, eps_decay, method_.obs_mode, device
+                    )
+                    if method_.__name__ in [
+                        "SemiGradientSarsaCNN",
+                        "SemiGradientSarsaNCNN",
+                    ]:
+                        method = method_(env, device=device, network_class=GridWorldCNN)
+                    else:
+                        method = method_(env, device=device)
                     callback = partial(success_callback, env=env.env)
                     max_s = (
                         max_steps + 1
@@ -152,7 +151,7 @@ def benchmark(
 
         print(f"Finished benchmarking grid size {n} x {n} in {time.time() - start}s")
 
-    plot_results(steps_needed, methods, min_grid_size, max_grid_size, fig_path)
+    plot_results(steps_needed, methods, list(ns), fig_path)
 
 
 if __name__ == "__main__":
@@ -165,4 +164,12 @@ if __name__ == "__main__":
     benchmark(
         [DynaQ],
         fig_path="results/planning.png",
+    )
+    benchmark(
+        [
+            SemiGradientSarsaLinear[tuple[torch.Tensor, int]],
+            SemiGradientSarsaCNN[tuple[torch.Tensor, int], GridWorldCNN],
+            SemiGradientSarsaNCNN[tuple[torch.Tensor, int], GridWorldCNN],
+        ],
+        fig_path="results/td_approx.png",
     )

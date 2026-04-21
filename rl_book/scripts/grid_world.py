@@ -1,15 +1,20 @@
 import argparse
 
 import gymnasium as gym
-from gymnasium.envs.toy_text.frozen_lake import generate_random_map
+import torch
 
-from rl_book.env import GridWorldEnv
+from rl_book.env import (GridWorldImageWrapper, ObsMode,
+                         generate_random_grid_world_env)
 from rl_book.methods.dp import policy_iteration, value_iteration
 from rl_book.methods.inference import test_single_player
 from rl_book.methods.mc import OffPolicyMC, OnPolicyMC
 from rl_book.methods.method import RLMethod
+from rl_book.methods.models import GridWorldCNN
 from rl_book.methods.planning import DynaQ
 from rl_book.methods.td import DoubleQ, ExpectedSarsa, QLearning, Sarsa
+from rl_book.methods.td_approx import (SemiGradientSarsaCNN,
+                                       SemiGradientSarsaLinear,
+                                       SemiGradientSarsaNCNN)
 from rl_book.methods.td_n import SarsaN, TreeN
 from rl_book.methods.training import train_single_player
 
@@ -24,16 +29,14 @@ def solve_grid_world(method_name: str) -> None:
     Args:
         method: solving method
     """
-    desc = generate_random_map(size=4)
-
-    gym_env_train = gym.make(
-        "FrozenLake-v1",
-        desc=desc,
-        # map_name="4x4",
-        is_slippery=False,
+    obs_mode = (
+        ObsMode.RASTERIZED
+        if method_name in ["semi_gradient_sarsa_cnn", "semi_gradient_sarsa_n_cnn"]
+        else ObsMode.DEFAULT
     )
-    env_train = GridWorldEnv(
-        gym_env_train, GAMMA, intermediate_rewards=True, eps_decay=True
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    env_train, desc = generate_random_grid_world_env(
+        n=4, extra_rewards=True, eps_decay=True, obs_mode=obs_mode, device=device
     )
 
     # Find policy
@@ -61,10 +64,20 @@ def solve_grid_world(method_name: str) -> None:
             method = TreeN(env_train)
         elif method_name == "dyna_q":
             method = DynaQ(env_train)
+        elif method_name == "semi_gradient_sarsa_linear":
+            method = SemiGradientSarsaLinear[tuple[torch.Tensor, int]](env_train)
+        elif method_name == "semi_gradient_sarsa_cnn":
+            method = SemiGradientSarsaCNN[tuple[torch.Tensor, int], GridWorldCNN](
+                env_train, device=device, network_class=GridWorldCNN
+            )
+        elif method_name == "semi_gradient_sarsa_n_cnn":
+            method = SemiGradientSarsaNCNN[tuple[torch.Tensor, int], GridWorldCNN](
+                env_train, device=device, network_class=GridWorldCNN
+            )
         else:
             raise ValueError(f"Unknown solution method {method_name}")
 
-        train_single_player(env_train, method, 10000)
+        train_single_player(env_train, method, 1000)
 
     gym_env_test = gym.make(
         "FrozenLake-v1",
@@ -73,6 +86,8 @@ def solve_grid_world(method_name: str) -> None:
         is_slippery=False,
         render_mode="human",
     )
+    if obs_mode == ObsMode.RASTERIZED:
+        gym_env_test = GridWorldImageWrapper(gym_env_test, device=device)
 
     # Test policy and visualize found solution
     test_single_player(gym_env_test, method)

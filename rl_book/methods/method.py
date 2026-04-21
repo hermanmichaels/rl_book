@@ -1,20 +1,25 @@
 import os
 import pickle
 from abc import ABC
-from typing import Any
+from typing import Any, ClassVar, Generic, TypeVar
 
 import numpy as np
 
-from rl_book.env import GameResult, ParametrizedEnv
+from rl_book.env import GameResult, ObsMode, ParametrizedEnv
 from rl_book.replay_utils import ReplayItem
 
 SAVE_PATH = "weights/"
+S = TypeVar("S")
 
 
-class RLMethod(ABC):
+class RLMethod(Generic[S], ABC):
     """Base class for RL methods."""
 
-    def __init__(self, env: ParametrizedEnv, load_weights: bool = False) -> None:
+    obs_mode: ClassVar[ObsMode] = ObsMode.DEFAULT
+
+    def __init__(
+        self, env: ParametrizedEnv, load_weights: bool = False, **_: object
+    ) -> None:
         self.env = env
         self._train = True
 
@@ -30,7 +35,7 @@ class RLMethod(ABC):
         raise NotImplementedError
 
     def act(
-        self, state: int, step: int | None = None, mask: np.ndarray | list = []
+        self, state: S, step: int | None = None, mask: np.ndarray | list = []
     ) -> int:
         """Called during training to act when generating episodes.
 
@@ -44,7 +49,7 @@ class RLMethod(ABC):
         """
         raise NotImplementedError
 
-    def update(self, episode: list[ReplayItem], step: int) -> None:
+    def update(self, episode: list[ReplayItem[S]], step: int) -> None:
         """Updates the method's parameters.
 
         Args:
@@ -53,7 +58,7 @@ class RLMethod(ABC):
         """
         pass
 
-    def finalize(self, episode: list[ReplayItem], step: int) -> None:
+    def finalize(self, episode: list[ReplayItem[S]], step: int) -> None:
         """Called when one episode generation has finished.
 
         Args:
@@ -66,6 +71,15 @@ class RLMethod(ABC):
         cloned = self.__class__(self.env)
         return cloned
 
+    def _is_empty_mask(self, mask) -> bool:
+        if mask is None:
+            return True
+
+        if isinstance(mask, np.ndarray):
+            return mask.size == 0
+
+        return len(mask) == 0
+
     def get_allowed_actions(self, mask: np.ndarray | list) -> np.ndarray:
         """Gets the allowed action indices.
 
@@ -77,7 +91,7 @@ class RLMethod(ABC):
         """
         return (
             np.nonzero(mask)[0].tolist()
-            if mask != []
+            if not self._is_empty_mask(mask)
             else np.asarray([a for a in range(self.env.get_action_space_len())])
         )
 
@@ -113,7 +127,7 @@ class MethodWithStats:
     """Wrapper around RLMethod which keeps track of win / lose stats for
     multi-player games."""
 
-    def __init__(self, method: RLMethod) -> None:
+    def __init__(self, method: RLMethod, obs_mode=ObsMode.DEFAULT) -> None:
         self.method = method
         self.wins = 0
         self.draws = 0

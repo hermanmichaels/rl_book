@@ -1,9 +1,11 @@
 import copy
 import pickle
+from abc import ABC
 from collections import defaultdict
 from typing import Any, DefaultDict
 
 import numpy as np
+from typing_extensions import override
 
 from rl_book.env import ParametrizedEnv
 from rl_book.methods.method import RLMethod
@@ -11,19 +13,25 @@ from rl_book.replay_utils import ReplayItem
 from rl_book.utils import ConstantFactory
 
 
-class MCMethod(RLMethod):
-    def __init__(self, env: ParametrizedEnv, load_weights: bool = False) -> None:
-        super().__init__(env, load_weights)
+class MCMethod(RLMethod[int], ABC):
+    def __init__(
+        self, env: ParametrizedEnv, load_weights: bool = False, **kwargs: object
+    ) -> None:
         self.Q: DefaultDict[tuple[int, int], float] = defaultdict(float)
         self.pi: DefaultDict[tuple[int, int], float] = defaultdict(
-            ConstantFactory(1.0 / self.env.get_action_space_len())
+            ConstantFactory(1.0 / env.get_action_space_len())
         )
 
+        super().__init__(env, load_weights, **kwargs)
+
+    @override
     def clone(self):
         cloned = super().clone()
         cloned.Q = copy.deepcopy(self.Q)
+        cloned.pi = copy.deepcopy(self.pi)
         return cloned
 
+    @override
     def act(
         self, state: int, step: int | None = None, mask: np.ndarray | list = []
     ) -> int:
@@ -38,25 +46,32 @@ class MCMethod(RLMethod):
         else:
             return actions[np.argmax(probs)]
 
+    @override
     def _get_save_data(self) -> Any:
         return self.Q, self.pi
 
+    @override
     def _load_weights(self, save_path: str) -> None:
         with open(save_path, "rb") as f:
             self.Q, self.pi = pickle.load(f)
 
 
 class OnPolicyMC(MCMethod):
-    def __init__(self, env: ParametrizedEnv, load_weights: bool = False):
-        super().__init__(env, load_weights)
+    def __init__(
+        self, env: ParametrizedEnv, load_weights: bool = False, **kwargs: object
+    ):
         self.counts: DefaultDict[tuple[int, int], int] = defaultdict(int)
 
+        super().__init__(env, load_weights, **kwargs)
+
+    @override
     def get_name(self) -> str:
         return "OnPolicyMc"
 
-    def finalize(self, episode: list[ReplayItem], step: int) -> None:
+    @override
+    def finalize(self, episode: list[ReplayItem[int]], step: int) -> None:
         G = 0.0
-        for t in range(len(episode) - 2, -1, -1):
+        for t in range(len(episode) - 1, -1, -1):
             s = episode[t].state
             a = episode[t].action
             r = episode[t].reward
@@ -91,10 +106,14 @@ class OnPolicyMC(MCMethod):
 
 
 class OffPolicyMC(MCMethod):
-    def __init__(self, env: ParametrizedEnv, load_weights: bool = False):
-        super().__init__(env, load_weights)
+    def __init__(
+        self, env: ParametrizedEnv, load_weights: bool = False, **kwargs: object
+    ):
         self.C: DefaultDict[tuple[int, int], float] = defaultdict(int)
 
+        super().__init__(env, load_weights, **kwargs)
+
+    @override
     def get_name(self) -> str:
         return "OffPolicyMC"
 
@@ -111,12 +130,13 @@ class OffPolicyMC(MCMethod):
             for a in range(n_actions):
                 self.pi[s, a] = 1 - eps if a == best_action else eps / (n_actions - 1)
 
-    def finalize(self, episode, step):
+    @override
+    def finalize(self, episode: list[ReplayItem[int]], step: int) -> None:
         # Note: self.pi is here used as the behavior policy b, while the target policy π
         # is implicity represented by argmax(Q).
         G = 0.0
-        W = 1
-        for t in range(len(episode) - 2, -1, -1):
+        W = 1.0
+        for t in range(len(episode) - 1, -1, -1):
             s = episode[t].state
             a = episode[t].action
             r = episode[t].reward
