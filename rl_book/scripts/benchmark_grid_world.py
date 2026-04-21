@@ -152,20 +152,20 @@ def benchmark(
 
         print(f"Finished benchmarking grid size {n} x {n} in {time.time() - start}s")
 
-    plot_results(steps_needed, methods, ns, fig_path)
+    plot_results(steps_needed, methods, list(ns), fig_path)
 
 
 if __name__ == "__main__":
-    # benchmark(
-    #     [OnPolicyMC, OffPolicyMC],
-    #     fig_path="results/mc.png",
-    # )
-    # benchmark([Sarsa, QLearning, ExpectedSarsa, DoubleQ], fig_path="results/td.png")
-    # benchmark([SarsaN, TreeN], fig_path="results/td_n.png")
-    # benchmark(
-    #     [DynaQ],
-    #     fig_path="results/planning.png",
-    # )
+    benchmark(
+        [OnPolicyMC, OffPolicyMC],
+        fig_path="results/mc.png",
+    )
+    benchmark([Sarsa, QLearning, ExpectedSarsa, DoubleQ], fig_path="results/td.png")
+    benchmark([SarsaN, TreeN], fig_path="results/td_n.png")
+    benchmark(
+        [DynaQ],
+        fig_path="results/planning.png",
+    )
     benchmark(
         [
             SemiGradientSarsaLinear[tuple[torch.Tensor, int]],

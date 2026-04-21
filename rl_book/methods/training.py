@@ -180,4 +180,3 @@ def train_multi_player(
             zoo = zoo[:zoo_size]
 
         env.env.close()
-
