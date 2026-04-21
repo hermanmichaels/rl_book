@@ -188,7 +188,7 @@ def train_multi_player(
 
 
 def train_multi_player_vectorized(
-    env_fn: MultiPlayerEnv,  # TODO
+    env_fn: MultiPlayerEnv,
     methods: list[MethodWithStats],
     zoo: list[MethodWithStats],
     max_steps: int = 100,
@@ -252,7 +252,7 @@ def train_multi_player_vectorized(
             action[env.status != AgentStatus.ALIVE] = -1
             env.step(action)
 
-            state_dict[agent] = (state, action, mask)  # todo: mask?
+            state_dict[agent] = (state, action, mask)
 
             cur_agent = env.agent_selection()
             if (
@@ -265,9 +265,9 @@ def train_multi_player_vectorized(
 
                 batch.store(
                     s, a, rewards, s_new, dones, mask
-                )  # TODO: batch only needs half
+                )
 
-            # TODO
+            # All environments finished
             if env.status.sum() == num_parallel_envs * 2:
                 break
 

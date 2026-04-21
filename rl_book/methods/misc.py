@@ -46,9 +46,6 @@ class RandomBatched(RLMethod):
         if invalid_zero_sum.any():
             probs[invalid_zero_sum] += 1 / probs.shape[1]
 
-        # if torch.sum(probs) == 0:
-        #     probs += 1 / probs.shape[1]
-
         return torch.multinomial(probs, num_samples=1).squeeze(1)
 
     def _get_save_data(self) -> Any:

@@ -74,7 +74,7 @@ class ResidualBlock(nn.Module):
 
 class ConnectFourCNN(nn.Module):
     """
-    Stronger but still lightweight Connect Four Q-network.
+    CNN to parse ConnectFour scenes.
 
     Input:
         [B, 2, 6, 7]

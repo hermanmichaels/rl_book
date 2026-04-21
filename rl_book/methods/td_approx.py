@@ -219,10 +219,12 @@ class SemiGradientSarsaCNN(ApproximateTDMethod[S], Generic[S, T]):
         if isinstance(state, tuple):
             q_values = self.model(state[0].unsqueeze(0))
         elif isinstance(state, torch.Tensor):
-            q_values = self.model(state)  # TODO
+            if len(state.shape) < 4:
+                # Insert batch dimension if not present
+                state = state.unsqueeze(0)
+            q_values = self.model(state)
         else:
             raise ValueError(f"Got unexpected type {type(state)}")
-        #  TODO: mask already tensor?
         q_masked = q_values.masked_fill(
             ~torch.Tensor(mask).bool().cuda(), float("-inf")
         )
@@ -268,11 +270,8 @@ class SemiGradientSarsaCNN(ApproximateTDMethod[S], Generic[S, T]):
             target = torch.tensor(cur_state.reward, device=self.device)
 
         loss = F.mse_loss(q_sa, target)
-
         self.optimizer.zero_grad()
-
         loss.backward()
-
         self.optimizer.step()
 
     def _get_save_data(self) -> Any:
@@ -287,27 +286,26 @@ class SemiGradientSarsaCNN(ApproximateTDMethod[S], Generic[S, T]):
         repeat_len = batch.states.shape[0]
 
         q = self.q(batch.states, np.repeat(self.all_actions[:1], repeat_len, axis=0))
+        # Predicted Q values of selected actions
         q_sa = q.gather(1, batch.actions.unsqueeze(1)).squeeze(1)
 
-        assert (batch.actions >= 0).all().item()
-        assert (batch.actions < q.shape[1]).all().item()
-
         with torch.no_grad():
+            # [mbs, num_actions]
+            legal = batch.mask.bool()
+            # [mbs]
+            has_legal = legal.any(dim=1)
+
             q_next = self.q(
                 batch.next_states, np.repeat(self.all_actions[:1], repeat_len, axis=0)
             )
-
-            legal = batch.mask.bool()  # [B, A]
-            has_legal = legal.any(dim=1)  # [B]
-
             q_next_masked = q_next.masked_fill(~legal, float("-inf"))
 
-            max_next = q_next_masked.max(dim=1).values  # [B] (may contain -inf)
+            # [mbs]
+            max_next = q_next_masked.max(dim=1).values
             max_next = torch.where(has_legal, max_next, torch.zeros_like(max_next))
 
             target = batch.rewards + self.env.gamma * (~batch.dones).float() * max_next
 
-        # valid_mask = actions != -1
         loss = F.smooth_l1_loss(q_sa, target)
 
         self.optimizer.zero_grad()
