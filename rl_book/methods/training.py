@@ -233,13 +233,6 @@ def train_multi_player_vectorized(
             env.status[done_idxs] = AgentStatus.STOPPING
             
             for idx in done_idxs:
-                # print(idx)
-                # print(env.get_game_result(
-                #         env.rewards(idx, True) # type: ignore
-                #     ))
-                # print(env.get_game_result(
-                #         env.rewards(idx, False) # type: ignore
-                #     ))
                 methods[env.method_idx].update_result(
                     env.get_game_result(
                         env.rewards(idx, True) # type: ignore
@@ -307,8 +300,4 @@ def train_multi_player_vectorized(
             zoo.append(methods[env.method_idx].clone())
             zoo = sorted(zoo, key=lambda x: -x.get_win_ratio())
             zoo = zoo[:zoo_size]
-
-        
-
-        # env.env.close()
 

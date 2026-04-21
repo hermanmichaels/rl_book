@@ -262,22 +262,17 @@ class SemiGradientSarsaCNN(ApproximateTDMethod[S], Generic[S, T]):
 
         cur_state = episode[len(episode) - 1]
 
-        q_values = self.q(cur_state.state, self.all_actions) # TODO: all:actions ??
+        q_values = self.q(cur_state.state, self.all_actions)
         q_sa = q_values[0, cur_state.action]
 
         with torch.no_grad():
             target = torch.tensor(cur_state.reward, device=self.device)
 
-        # loss = F.mse_loss(q_sa, target)
-        loss = F.smooth_l1_loss(q_sa, target)
+        loss = F.mse_loss(q_sa, target)
+
         self.optimizer.zero_grad()
 
         loss.backward()
-
-        torch.nn.utils.clip_grad_norm_(
-            self.model.parameters(),
-            max_norm=10.0,
-        )
 
         self.optimizer.step()
 
