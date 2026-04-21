@@ -78,7 +78,6 @@ def plot_results(
             label=methods[idx].__name__,
         )
         plt.legend()
-        plt.xticks([5, 10, 15, 20, 25])
         plt.xlabel("Gridworld size")
         plt.ylabel("Steps needed")
 
