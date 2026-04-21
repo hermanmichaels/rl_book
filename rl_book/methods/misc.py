@@ -23,10 +23,11 @@ class Random(RLMethod):
 
     def _get_save_data(self) -> Any:
         return None
-    
+
+
 class RandomBatched(RLMethod):
     obs_mode: ClassVar[ObsMode] = ObsMode.RASTERIZED
-    
+
     def __init__(
         self, env: ParametrizedEnv, device: torch.device = torch.device("cpu")
     ):
@@ -42,15 +43,16 @@ class RandomBatched(RLMethod):
 
         row_sum = probs.sum(dim=1)
         invalid_zero_sum = row_sum <= 0
-
         if invalid_zero_sum.any():
             probs[invalid_zero_sum] += 1 / probs.shape[1]
 
-        if torch.sum(probs) == 0:
-            probs += 1 / probs.shape[1]
+        # if torch.sum(probs) == 0:
+        #     probs += 1 / probs.shape[1]
 
         return torch.multinomial(probs, num_samples=1).squeeze(1)
 
     def _get_save_data(self) -> Any:
         return None
 
+    def batch_update(self, batch):
+        pass

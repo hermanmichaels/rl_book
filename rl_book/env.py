@@ -1,4 +1,3 @@
-from concurrent.futures import ThreadPoolExecutor
 from enum import Enum
 from typing import Any, Generic, Literal, TypeVar, cast, overload
 
@@ -102,7 +101,6 @@ class ParametrizedEnv(Generic[S]):
             - constant value if no exploration decay
             - otherwise linearly decaying value
         """
-        # step = 100000
         return (
             self.eps_end
             if not self.eps_decay
@@ -300,7 +298,6 @@ class MultiPlayerEnv(ParametrizedEnv[S], Generic[S]):
         raise NotImplementedError
 
 
-
 class TicTacToeEnv(MultiPlayerEnv[int | torch.Tensor]):
     """TicTacToe env."""
 
@@ -356,7 +353,6 @@ class TicTacToeEnv(MultiPlayerEnv[int | torch.Tensor]):
         2 | 5 | 8"
 
 
-
 class ConnectFourEnv(MultiPlayerEnv[int | torch.Tensor]):
     """ConnectFour env."""
 
@@ -391,9 +387,6 @@ class ConnectFourEnv(MultiPlayerEnv[int | torch.Tensor]):
 
             return state_encoded
         elif obs_mode == ObsMode.RASTERIZED:
-            # print("###")
-            # save_connect4_obs(obs, f"plots/{self.c}.png")
-            # assert False
             # TODO: not to tensor
             self.c += 1
             if obs.ndim == 3:
@@ -421,6 +414,3 @@ class ConnectFourEnv(MultiPlayerEnv[int | torch.Tensor]):
         return (
             "Please indicate in which column in which to drop the next token (0 - 6):"
         )
-
-
-

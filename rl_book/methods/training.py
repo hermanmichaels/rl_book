@@ -1,19 +1,18 @@
 # done for unit test?
 import random
+import time
 from typing import Callable
 
 import matplotlib.pyplot as plt
+import numpy as np
+import torch
 
-from rl_book.env_vectorized import VectorizedEnv, VectorizedReplayBuffer
-from rl_book.env_vectorized import AgentStatus
 from rl_book.env import MultiPlayerEnv, ParametrizedEnv
+from rl_book.env_vectorized import (AgentStatus, VectorizedEnv,
+                                    VectorizedReplayBuffer)
 from rl_book.methods.method import MethodWithStats, RLMethod
 from rl_book.pretty_print import log_methods
 from rl_book.replay_utils import ReplayItem
-import numpy as np
-import torch
-from rl_book.env import MultiPlayerEnv
-import time
 
 
 def train_single_player(
@@ -188,16 +187,15 @@ def train_multi_player(
         env.env.close()
 
 
-
 def train_multi_player_vectorized(
-    env_fn: MultiPlayerEnv, # TODO
+    env_fn: MultiPlayerEnv,  # TODO
     methods: list[MethodWithStats],
     zoo: list[MethodWithStats],
     max_steps: int = 100,
     zoo_update_interval: int = 1000,
     zoo_size: int = 50,
     plot_interval: int | None = None,
-    num_parallel_envs: int = 2
+    num_parallel_envs: int = 2,
 ) -> None:
     """Trains a method on multi-player environments (atm only 2 players are supported).
 
@@ -231,29 +229,30 @@ def train_multi_player_vectorized(
             new_done = dones & (env.status == AgentStatus.ALIVE)
             done_idxs = np.nonzero(new_done)[0].tolist()
             env.status[done_idxs] = AgentStatus.STOPPING
-            
+
             for idx in done_idxs:
                 methods[env.method_idx].update_result(
-                    env.get_game_result(
-                        env.rewards(idx, True) # type: ignore
-                    )
+                    env.get_game_result(env.rewards(idx, True))  # type: ignore
                 )
                 zoo[env.opponent_idx].update_result(
-                    env.get_game_result(
-                        env.rewards(idx, False) # type: ignore
-                    )
+                    env.get_game_result(env.rewards(idx, False))  # type: ignore
                 )
 
             cur_method = (
-                methods[env.method_idx]
-                if env.is_player(agent) 
-                else env.opponent
+                methods[env.method_idx] if env.is_player(agent) else env.opponent
             )
-            action = cur_method.method.act(torch.from_numpy(state).cuda(), step, torch.from_numpy(mask).cuda()).detach().cpu().numpy()
+            action = (
+                cur_method.method.act(
+                    torch.from_numpy(state).cuda(), step, torch.from_numpy(mask).cuda()
+                )
+                .detach()
+                .cpu()
+                .numpy()
+            )
             action[env.status != AgentStatus.ALIVE] = -1
             env.step(action)
 
-            state_dict[agent] = (state, action, mask) # todo: mask?
+            state_dict[agent] = (state, action, mask)  # todo: mask?
 
             cur_agent = env.agent_selection()
             if (
@@ -264,7 +263,9 @@ def train_multi_player_vectorized(
 
                 s, a, _ = state_dict.pop(cur_agent)
 
-                batch.store(s, a, rewards, s_new, dones, mask) # TODO: batch only needs half
+                batch.store(
+                    s, a, rewards, s_new, dones, mask
+                )  # TODO: batch only needs half
 
             # TODO
             if env.status.sum() == num_parallel_envs * 2:
@@ -300,4 +301,3 @@ def train_multi_player_vectorized(
             zoo.append(methods[env.method_idx].clone())
             zoo = sorted(zoo, key=lambda x: -x.get_win_ratio())
             zoo = zoo[:zoo_size]
-

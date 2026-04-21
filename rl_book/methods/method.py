@@ -4,10 +4,10 @@ from abc import ABC
 from typing import Any, ClassVar, Generic, TypeVar
 
 import numpy as np
+import torch
 
 from rl_book.env import GameResult, ObsMode, ParametrizedEnv
 from rl_book.replay_utils import ReplayItem
-import torch
 
 SAVE_PATH = "weights/"
 S = TypeVar("S")
@@ -90,17 +90,14 @@ class RLMethod(Generic[S], ABC):
         Returns:
             indices of allowed actions (e.g. [0, 1, 4, ...])
         """
-        assert not self._is_empty_mask(mask)
-        return mask
-    
-        import ipdb
-        ipdb.set_trace()
+        if isinstance(mask, torch.Tensor):
+            return mask
+
         return (
             np.nonzero(mask)[0].tolist()
             if not self._is_empty_mask(mask)
             else np.asarray([a for a in range(self.env.get_action_space_len())])
         )
-
 
     def train(self):
         self._train = True
@@ -128,10 +125,9 @@ class RLMethod(Generic[S], ABC):
 
     def _get_save_data(self) -> Any:
         raise NotImplementedError
-    
-    # TODO: not implemented, implement in random?
+
     def batch_update(self, batch):
-        pass
+        raise NotImplementedError
 
 
 class MethodWithStats:
