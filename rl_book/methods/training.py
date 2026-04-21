@@ -12,9 +12,7 @@ from rl_book.pretty_print import log_methods
 from rl_book.replay_utils import ReplayItem
 import numpy as np
 import torch
-import copy
-from pettingzoo.classic import connect_four_v3, tictactoe_v3
-from rl_book.env import ConnectFourEnv, MultiPlayerEnv, TicTacToeEnv, save_connect4_obs
+from rl_book.env import MultiPlayerEnv
 import time
 
 
@@ -278,22 +276,6 @@ def train_multi_player_vectorized(
             # TODO
             if env.status.sum() == num_parallel_envs * 2:
                 break
-
-        # if not methods[env.method_idx].method.get_name() == "Random":
-        #     print("######")
-        #     for i in range(42):
-        #         print(f"{i}: {batch.act_buf[i, 0]} / {batch.rew_buf[i, 0]} / {batch.done_buf[i, 0]}")
-        #         save_connect4_obs(batch.obs_buf[i, 0], batch.rew_buf[i, 0], batch.done_buf[i, 0], batch.act_buf[i, 0], f"plots/1/{i}-a.png")
-        #         save_connect4_obs(batch.obs_next_buf[i, 0], batch.rew_buf[i, 0], batch.done_buf[i, 0], batch.act_buf[i, 0], f"plots/1/{i}-next.png")
-
-        #     print("------")
-        #     for i in range(42):
-        #         print(f"{i}: {batch.act_buf[i, 1]} / {batch.rew_buf[i, 1]} / {batch.done_buf[i, 1]}")
-        #         save_connect4_obs(batch.obs_buf[i, 1], batch.rew_buf[i, 1], batch.done_buf[i, 1], batch.act_buf[i, 1], f"plots/2/{i}-2-a.png")
-        #         save_connect4_obs(batch.obs_next_buf[i, 1], batch.rew_buf[i, 1], batch.done_buf[i, 1], batch.act_buf[i, 1], f"plots/2/{i}-2-next.png")
-
-        #     import ipdb
-        #     ipdb.set_trace()
 
         methods[env.method_idx].method.batch_update(batch.get_batch("cuda"))
 

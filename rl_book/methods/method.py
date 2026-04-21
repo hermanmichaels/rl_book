@@ -81,7 +81,7 @@ class RLMethod(Generic[S], ABC):
 
         return len(mask) == 0
 
-    def get_allowed_actions(self, mask: np.ndarray | list) -> np.ndarray:
+    def get_allowed_actions(self, mask: np.ndarray | list | torch.Tensor) -> np.ndarray:
         """Gets the allowed action indices.
 
         Args:
@@ -90,7 +90,16 @@ class RLMethod(Generic[S], ABC):
         Returns:
             indices of allowed actions (e.g. [0, 1, 4, ...])
         """
+        assert not self._is_empty_mask(mask)
         return mask
+    
+        import ipdb
+        ipdb.set_trace()
+        return (
+            np.nonzero(mask)[0].tolist()
+            if not self._is_empty_mask(mask)
+            else np.asarray([a for a in range(self.env.get_action_space_len())])
+        )
 
 
     def train(self):

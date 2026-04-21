@@ -80,7 +80,7 @@ def benchmark_multi_player(
     ]
     zoo = [MethodWithStats(RandomBatched(env))]
     # Train given methods
-    train_multi_player_vectorized(env_fn, methods, zoo, max_steps=1000, plot_interval=100)
+    train_multi_player_vectorized(env_fn, methods, zoo, max_steps=100000, plot_interval=1000)
 
     # Now give user chance to play against one of the methods
     # TOOD: need good wrapper from action to input

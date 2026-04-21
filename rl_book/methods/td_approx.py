@@ -218,8 +218,6 @@ class SemiGradientSarsaCNN(ApproximateTDMethod[S], Generic[S, T]):
         state: S,
         mask: np.ndarray,
     ) -> torch.Tensor:
-        # print(mask.shape)
-        # print(state.shape)
         assert mask.ndim == 2
         if isinstance(state, tuple):
             q_values = self.model(state[0].unsqueeze(0))
@@ -227,8 +225,6 @@ class SemiGradientSarsaCNN(ApproximateTDMethod[S], Generic[S, T]):
             q_values = self.model(state) # TODO
         else:
             raise ValueError(f"Got unexpected type {type(state)}")
-        # import ipdb
-        # ipdb.set_trace()
         #  TODO: mask already tensor?
         q_masked = q_values.masked_fill(~torch.Tensor(mask).bool().cuda(), float("-inf"))
         return q_masked
@@ -246,9 +242,6 @@ class SemiGradientSarsaCNN(ApproximateTDMethod[S], Generic[S, T]):
 
         prev_state = episode[len(episode) - 2]
         cur_state = episode[len(episode) - 1]
-
-        # import ipdb
-        # ipdb.set_trace()
 
         q_values = self.q(prev_state.state, self.all_actions)
         q_sa = q_values[0, prev_state.action]
@@ -326,8 +319,6 @@ class SemiGradientSarsaCNN(ApproximateTDMethod[S], Generic[S, T]):
 
             target = batch.rewards + self.env.gamma * (~batch.dones).float() * max_next
 
-        # import ipdb
-        # ipdb.set_trace()
 
         # valid_mask = actions != -1
         loss = F.smooth_l1_loss(q_sa, target)
@@ -399,9 +390,6 @@ class SemiGradientSarsaNCNN(ApproximateTDMethod[S], Generic[S, T]):
             raise ValueError(f"Got unexpected type {type(state)}")
 
         mask = torch.zeros_like(q_values).bool()
-
-        import ipdb
-        ipdb.set_trace()
         
         mask[:, allowed_actions] = 1.0
         q_masked = q_values.masked_fill(~mask, float("-inf"))
