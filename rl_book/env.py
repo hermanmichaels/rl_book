@@ -358,7 +358,6 @@ class ConnectFourEnv(MultiPlayerEnv[int | torch.Tensor]):
 
     def __init__(self, env: Env, gamma=0.95, device=torch.device("cpu")) -> None:
         super().__init__(env, gamma, ["player_0", "player_1"], device)
-        self.c = 0
 
     def obs_to_state(
         self, obs: Any, start_pos: int = 0, obs_mode: ObsMode = ObsMode.DEFAULT
@@ -378,7 +377,7 @@ class ConnectFourEnv(MultiPlayerEnv[int | torch.Tensor]):
                     else:
                         state_flat.append(0)  # empty
 
-            state_flat.append(start_pos)  # TODO: remove!
+            state_flat.append(start_pos)
 
             # Convert to base-3 integer
             state_encoded = 0
@@ -387,8 +386,6 @@ class ConnectFourEnv(MultiPlayerEnv[int | torch.Tensor]):
 
             return state_encoded
         elif obs_mode == ObsMode.RASTERIZED:
-            # TODO: not to tensor
-            self.c += 1
             if obs.ndim == 3:
                 res = torch.as_tensor(
                     np.transpose(obs, [2, 1, 0]), device=self.device

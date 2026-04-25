@@ -307,16 +307,12 @@ class SemiGradientSarsaCNN(ApproximateTDMethod[S], Generic[S, T]):
             target = batch.rewards + self.env.gamma * (~batch.dones).float() * max_next
 
         loss = F.smooth_l1_loss(q_sa, target)
-
         self.optimizer.zero_grad()
-
         loss.backward()
-
         torch.nn.utils.clip_grad_norm_(
             self.model.parameters(),
             max_norm=1.0,
         )
-
         self.optimizer.step()
 
 
