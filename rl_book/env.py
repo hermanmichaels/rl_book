@@ -111,7 +111,9 @@ class ParametrizedEnv(Generic[S]):
             )
         )
 
-    def step(self, action: int, old_obs: S) -> tuple[S, float, bool, bool, dict]:
+    def step(
+        self, action: int | torch.Tensor, old_obs: S
+    ) -> tuple[S, float, bool, bool, dict]:
         raise NotImplementedError
 
     def get_action_space_len(self) -> int:
@@ -154,7 +156,9 @@ class GridWorldEnv(ParametrizedEnv[S], Generic[S]):
             observation // self.grid_size + observation % self.grid_size
         ) / self.grid_size
 
-    def step(self, action: int, old_obs: S) -> tuple[S, float, bool, bool, dict]:
+    def step(
+        self, action: int | torch.Tensor, old_obs: S
+    ) -> tuple[S, float, bool, bool, dict]:
         """Executes a step in the environment and, among others, returns new observation
         and observed reward.
         When "intermediate_rewards" is set, augment the reward by a progress heuristic,

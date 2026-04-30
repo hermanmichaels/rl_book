@@ -5,6 +5,7 @@ from collections import defaultdict
 from typing import Any, DefaultDict
 
 import numpy as np
+import torch
 from typing_extensions import override
 
 from rl_book.env import ParametrizedEnv
@@ -34,7 +35,7 @@ class MCMethod(RLMethod[int], ABC):
     @override
     def act(
         self, state: int, step: int | None = None, mask: np.ndarray | list = []
-    ) -> int:
+    ) -> int | torch.Tensor:
         actions = self.get_allowed_actions(mask)
         probs_arr = [self.pi[state, a] for a in actions]
         # Masked actions can cause sum(probs_arr) to be less than 1, causing

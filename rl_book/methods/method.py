@@ -37,7 +37,7 @@ class RLMethod(Generic[S], ABC):
 
     def act(
         self, state: S, step: int | None = None, mask: np.ndarray | list = []
-    ) -> int:
+    ) -> int | torch.Tensor:
         """Called during training to act when generating episodes.
 
         Args:
@@ -81,7 +81,9 @@ class RLMethod(Generic[S], ABC):
 
         return len(mask) == 0
 
-    def get_allowed_actions(self, mask: np.ndarray | list | torch.Tensor) -> np.ndarray:
+    def get_allowed_actions(
+        self, mask: np.ndarray | list | torch.Tensor
+    ) -> np.ndarray | torch.Tensor:
         """Gets the allowed action indices.
 
         Args:

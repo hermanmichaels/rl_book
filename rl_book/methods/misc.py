@@ -37,7 +37,7 @@ class RandomBatched(RLMethod):
         return "Random"
 
     def act(self, state: int, step: int | None = None, mask: np.ndarray | list = []):
-        allowed_actions = self.get_allowed_actions(mask).float()
+        allowed_actions = self.get_allowed_actions(mask).float()  # type: ignore
 
         probs = allowed_actions
 

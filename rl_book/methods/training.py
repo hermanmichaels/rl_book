@@ -46,6 +46,7 @@ def train_single_player(
                 action, observation
             )
 
+            assert isinstance(action, int)
             episode.append(ReplayItem(observation, action, reward))
             method.update(episode, step)
 
@@ -153,6 +154,7 @@ def train_multi_player(
             ):
                 s, a, mask = state_dict[env.players[player_pos]]
 
+                assert isinstance(a, int)
                 episode.append(ReplayItem(s, a, float(reward), mask))
 
                 methods[method_idx].method.update(episode, step)
@@ -174,7 +176,7 @@ def train_multi_player(
             plt.ylabel("Win %")
             plt.savefig("wins.png")
 
-            log_methods(methods, step)
+            log_methods(methods, step, 0)
 
             for method in methods:
                 method.method.save_weights()

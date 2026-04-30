@@ -1,12 +1,11 @@
 import random
 from dataclasses import dataclass
 from enum import IntEnum
-from typing import Generic, TypeVar
 
 import numpy as np
 import torch
 
-from rl_book.env import MultiPlayerEnv, ObsMode
+from rl_book.env import ObsMode
 
 
 class AgentStatus(IntEnum):
@@ -81,10 +80,7 @@ class VectorizedReplayBuffer:
         return TorchBatch(states, actions, rewards, next_states, dones, mask)
 
 
-E = TypeVar("E", bound=MultiPlayerEnv)
-
-
-class VectorizedEnv(Generic[E]):  # TODO: Generic, ABC
+class VectorizedEnv:  # TODO: Generic, ABC
     def __init__(self, env_fn, num_envs):
         self.envs = [env_fn() for _ in range(num_envs)]
         self.status = np.full(num_envs, AgentStatus.TERMINATED, dtype=np.int32)

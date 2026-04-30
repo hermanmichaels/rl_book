@@ -42,10 +42,10 @@ class ApproximateTDMethod(RLMethod[S], Generic[S], ABC):
         state: S,
         step: int | None = None,
         mask: np.ndarray | list = [],
-    ) -> int:
+    ) -> int | torch.Tensor:
         allowed_actions = self.get_allowed_actions(mask)
         if self._train and step and random.uniform(0, 1) < self.env.eps(step):
-            probs = allowed_actions.float()
+            probs = allowed_actions.float()  # type: ignore
 
             row_sum = probs.sum(dim=1)
             invalid_zero_sum = row_sum <= 0
@@ -54,7 +54,7 @@ class ApproximateTDMethod(RLMethod[S], Generic[S], ABC):
 
             return torch.multinomial(probs, num_samples=1).squeeze(1)
         else:
-            q_values = self.q(state, mask)
+            q_values = self.q(state, mask)  # type: ignore
 
             # Sample uniformly in case of ties
             max_q = q_values.max(dim=1, keepdim=True).values
@@ -108,7 +108,7 @@ class SemiGradientSarsaLinear(ApproximateTDMethod[S], Generic[S]):
     def get_name(self) -> str:
         return "SemiGradientSarsa-Linear"
 
-    def feature_fn(self, state: S, action: int) -> np.ndarray:
+    def feature_fn(self, state: S, action: int | torch.Tensor) -> np.ndarray:
         """Simple feature function returning a one-hot representation
         of state and action.
 
@@ -190,7 +190,9 @@ class SemiGradientSarsaCNN(ApproximateTDMethod[S], Generic[S, T]):
         self.model = network_class(num_actions).to(device)
         self.optimizer = torch.optim.Adam(self.model.parameters(), lr=1e-3)
         self.network_class = network_class
-        self.all_actions = np.ones((3, 7))  # TODO N!!
+        self.all_actions = np.ones(
+            (3, 7)
+        )  # TODO: this is hacked for Connect4, refactor to make flexibel
 
         super().__init__(env, load_weights, device, **kwargs)
 
@@ -221,7 +223,7 @@ class SemiGradientSarsaCNN(ApproximateTDMethod[S], Generic[S, T]):
         elif isinstance(state, torch.Tensor):
             if len(state.shape) < 4:
                 # Insert batch dimension if not present
-                state = state.unsqueeze(0)
+                state = state.unsqueeze(0)  # type: ignore
             q_values = self.model(state)
         else:
             raise ValueError(f"Got unexpected type {type(state)}")
