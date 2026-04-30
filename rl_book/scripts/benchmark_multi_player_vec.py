@@ -9,7 +9,7 @@ from rl_book.methods.inference import test_against_user
 from rl_book.methods.method import MethodWithStats
 from rl_book.methods.misc import RandomBatched
 from rl_book.methods.models import ConnectFourCNN, TicTacToeMLP
-from rl_book.methods.td_approx import (SemiGradientSarsaCNN)
+from rl_book.methods.td_approx import SemiGradientSarsaCNN
 from rl_book.methods.training import train_multi_player_vectorized
 
 torch.autograd.set_detect_anomaly(True)

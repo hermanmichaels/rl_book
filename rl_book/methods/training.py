@@ -263,9 +263,7 @@ def train_multi_player_vectorized(
 
                 s, a, _ = state_dict.pop(cur_agent)
 
-                batch.store(
-                    s, a, rewards, s_new, dones, mask
-                )
+                batch.store(s, a, rewards, s_new, dones, mask)
 
             # All environments finished
             if env.status.sum() == num_parallel_envs * 2:
