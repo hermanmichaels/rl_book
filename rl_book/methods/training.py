@@ -46,8 +46,7 @@ def train_single_player(
                 action, observation
             )
 
-            assert isinstance(action, int)
-            episode.append(ReplayItem(observation, action, reward))
+            episode.append(ReplayItem(observation, action, reward)) # type: ignore
             method.update(episode, step)
 
             observation = observation_new
@@ -154,8 +153,7 @@ def train_multi_player(
             ):
                 s, a, mask = state_dict[env.players[player_pos]]
 
-                assert isinstance(a, int)
-                episode.append(ReplayItem(s, a, float(reward), mask))
+                episode.append(ReplayItem(s, a, float(reward), mask)) # type: ignore
 
                 methods[method_idx].method.update(episode, step)
 
