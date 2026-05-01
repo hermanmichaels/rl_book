@@ -4,6 +4,7 @@ from abc import ABC
 from typing import Any, ClassVar, Generic, TypeVar
 
 import numpy as np
+import torch
 
 from rl_book.env import GameResult, ObsMode, ParametrizedEnv
 from rl_book.replay_utils import ReplayItem
@@ -36,7 +37,7 @@ class RLMethod(Generic[S], ABC):
 
     def act(
         self, state: S, step: int | None = None, mask: np.ndarray | list = []
-    ) -> int:
+    ) -> int | torch.Tensor:
         """Called during training to act when generating episodes.
 
         Args:
@@ -80,7 +81,9 @@ class RLMethod(Generic[S], ABC):
 
         return len(mask) == 0
 
-    def get_allowed_actions(self, mask: np.ndarray | list) -> np.ndarray:
+    def get_allowed_actions(
+        self, mask: np.ndarray | list | torch.Tensor
+    ) -> np.ndarray | torch.Tensor:
         """Gets the allowed action indices.
 
         Args:
@@ -89,6 +92,9 @@ class RLMethod(Generic[S], ABC):
         Returns:
             indices of allowed actions (e.g. [0, 1, 4, ...])
         """
+        if isinstance(mask, torch.Tensor):
+            return mask
+
         return (
             np.nonzero(mask)[0].tolist()
             if not self._is_empty_mask(mask)
@@ -122,6 +128,9 @@ class RLMethod(Generic[S], ABC):
     def _get_save_data(self) -> Any:
         raise NotImplementedError
 
+    def batch_update(self, batch):
+        raise NotImplementedError
+
 
 class MethodWithStats:
     """Wrapper around RLMethod which keeps track of win / lose stats for
@@ -134,8 +143,8 @@ class MethodWithStats:
         self.losses = 0
         self.picks = 0
 
-    def update_pick(self) -> None:
-        self.picks += 1
+    def update_pick(self, num_picks: int = 1) -> None:
+        self.picks += num_picks
 
     def update_result(self, result: GameResult) -> None:
         if result == GameResult.WIN:

@@ -9,7 +9,7 @@ RESET = "\033[0m"
 BOLD = "\033[1m"
 
 
-def log_methods(methods: list[MethodWithStats], step: int):
+def log_methods(methods: list[MethodWithStats], step: int, gps: float):
     sorted_methods = sorted(methods, key=lambda x: -x.get_win_ratio())
     max_name_len = max(len(m.method.get_name()) for m in methods)
     separator = "-" * max_name_len + "|" + "-" * 26
@@ -21,7 +21,7 @@ def log_methods(methods: list[MethodWithStats], step: int):
     if step > 0:
         sys.stdout.write(f"\033[{total_lines}A")
 
-    title = f"{BOLD}=== Method Stats at Step {step} ==={RESET}"
+    title = f"{BOLD}=== Method Stats at Step {step} (Games / s: {gps}) ==={RESET}"
     legend = (
         f"{'Method'.ljust(max_name_len)}| {GREEN}Wins{RESET} "
         f"/ {YELLOW}Draws{RESET} / {RED}Losses{RESET}"

@@ -111,7 +111,9 @@ class ParametrizedEnv(Generic[S]):
             )
         )
 
-    def step(self, action: int, old_obs: S) -> tuple[S, float, bool, bool, dict]:
+    def step(
+        self, action: int | torch.Tensor, old_obs: S
+    ) -> tuple[S, float, bool, bool, dict]:
         raise NotImplementedError
 
     def get_action_space_len(self) -> int:
@@ -154,7 +156,9 @@ class GridWorldEnv(ParametrizedEnv[S], Generic[S]):
             observation // self.grid_size + observation % self.grid_size
         ) / self.grid_size
 
-    def step(self, action: int, old_obs: S) -> tuple[S, float, bool, bool, dict]:
+    def step(
+        self, action: int | torch.Tensor, old_obs: S
+    ) -> tuple[S, float, bool, bool, dict]:
         """Executes a step in the environment and, among others, returns new observation
         and observed reward.
         When "intermediate_rewards" is set, augment the reward by a progress heuristic,
@@ -353,13 +357,11 @@ class TicTacToeEnv(MultiPlayerEnv[int | torch.Tensor]):
         2 | 5 | 8"
 
 
-
 class ConnectFourEnv(MultiPlayerEnv[int | torch.Tensor]):
     """ConnectFour env."""
 
     def __init__(self, env: Env, gamma=0.95, device=torch.device("cpu")) -> None:
         super().__init__(env, gamma, ["player_0", "player_1"], device)
-        self.c = 0
 
     def obs_to_state(
         self, obs: Any, start_pos: int = 0, obs_mode: ObsMode = ObsMode.DEFAULT
@@ -379,7 +381,7 @@ class ConnectFourEnv(MultiPlayerEnv[int | torch.Tensor]):
                     else:
                         state_flat.append(0)  # empty
 
-            state_flat.append(start_pos)  # TODO: remove!
+            state_flat.append(start_pos)
 
             # Convert to base-3 integer
             state_encoded = 0
@@ -388,10 +390,14 @@ class ConnectFourEnv(MultiPlayerEnv[int | torch.Tensor]):
 
             return state_encoded
         elif obs_mode == ObsMode.RASTERIZED:
-            self.c += 1
-            res = torch.as_tensor(
-                np.transpose(obs, [2, 1, 0]), device=self.device
-            ).float()
+            if obs.ndim == 3:
+                res = torch.as_tensor(
+                    np.transpose(obs, [2, 1, 0]), device=self.device
+                ).float()
+            else:
+                res = torch.as_tensor(
+                    np.transpose(obs, [0, 3, 2, 1]), device=self.device
+                ).float()
             return res
         raise ValueError(f"Got unexpected obs_mode {obs_mode}")
 
